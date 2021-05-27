@@ -1,0 +1,20 @@
+<launch>
+
+     <include file="$(find abb_irb120_moveit_config)/launch/demo.launch" />
+     <include file="$(find perception)/launch/camera_driver.launch" />
+          <include file="$(find abb_irb120_moveit_config)/launch/competition_model_camera_pose.launch" />
+
+     <!-- <include file="$(find ft_sensor_driver)/launch/force_control.launch" /> 
+     <include file="$(find cut_contour)/launch/control.launch" />
+     <include file="$(find screw_loosening)/launch/camera_pose_big_a3.launch" />
+     <include file="$(find cut_contour)/launch/pitch_control.launch" /> -->
+
+     <node name="pixel_to_point" pkg="perception" type="pointcloud_test.py" output="screen" />
+     <!-- <node name="path_tracking" pkg="cut_contour" type="servo_cut.py" output="screen" />  -->
+     <!-- <node name="path_tracking" pkg="cut_contour" type="cut_contour.py" output="screen" /> -->
+     <!-- <node pkg="screw_loosening" type="loosen_it.py" name="loosen_it" output="screen"/> -->
+     <node name="motors_on" pkg="egm_config" type="start_robot.bash" output="screen" />
+     <!-- <node name="smach_viewer" pkg="smach_viewer" type="smach_viewer.py" output="screen" />
+     <node name="rqt_multiplot" pkg="rqt_multiplot" type="rqt_multiplot" output="screen" /> -->
+
+</launch>

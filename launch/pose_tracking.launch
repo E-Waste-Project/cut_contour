@@ -1,0 +1,10 @@
+<launch>
+  <!-- Launch an example that sends commands via C++ API. -->
+
+  <node name="servo_server" pkg="cut_contour" type="pose_tracking" output="screen" >
+    <param name="parameter_ns" type="string" value="" />
+    <rosparam command="load" file="$(find cut_contour)/config/servo_config.yaml" />
+    <rosparam command="load" file="$(find cut_contour)/config/pose_tracking.yaml" />
+  </node>
+
+</launch>

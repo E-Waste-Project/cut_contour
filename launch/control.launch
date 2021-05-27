@@ -1,0 +1,16 @@
+<launch>
+    <node name="controller" pkg="pid" type="controller" ns="position" output="screen" >
+      <param name="node_name" value="position_pid" />
+      <param name="Kp" value="1" />
+      <param name="Ki" value="0.0" />
+      <param name="Kd" value="0" />
+      <param name="upper_limit" value="0.001" />
+      <param name="lower_limit" value="-0.001" />
+      <!-- <param name="windup_limit" value="11" />
+      <param name="max_loop_frequency" value="101.0" />
+      <param name="min_loop_frequency" value="101.0" / -->
+      <remap from="setpoint" to="/position/setpoint" />
+      <remap from="state" to="/position/state" />
+      <remap from="control_effort" to="/position/control_effort" />
+     </node>
+</launch>

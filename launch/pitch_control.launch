@@ -1,0 +1,21 @@
+<launch>
+    <node pkg="rostopic" type="rostopic" name="pitch_setpoint_pub" args="pub -l /pitch/setpoint std_msgs/Float64 0.0"/>
+  
+    <node name="pitch_control" pkg="pid" type="controller" ns="pitch" output="screen">
+      <param name="node_name" value="pitch_control" />
+      <param name="Kp" value="-0.1" />
+      <param name="Ki" value="0.0" />
+      <param name="Kd" value="0" />
+      <param name="angle_error" value="true"/>
+      <param name="upper_limit" value="0.05" />
+      <param name="lower_limit" value="-0.05" />
+      <!-- <param name="windup_limit" value="11" /> -->
+      <!-- <param name="max_loop_frequency" value="101.0" /> -->
+      <!-- <param name="min_loop_frequency" value="101.0"  -->
+      <remap from="setpoint" to="/pitch/setpoint" />
+      <remap from="state" to="/pitch/state" />
+      <remap from="control_effort" to="/pitch/control_effort" />
+
+     </node>
+
+</launch>
