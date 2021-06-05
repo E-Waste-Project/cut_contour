@@ -12,6 +12,7 @@ import rospy
 from copy import deepcopy
 import tf
 from math import fabs
+from robot_helpers import transform_poses
 
 
 class irb120():
@@ -175,7 +176,7 @@ class irb120():
         print(pose)
         pose_arr.header.frame_id = "tool0_comp"
         pose_arr.poses.append(pose)
-        tool_pose = self.__transform_poses("base_link", "tool0_comp", pose_arr)
+        tool_pose = transform_poses("base_link", "tool0_comp", pose_arr)
 
         return tool_pose.poses[0]
 
@@ -245,24 +246,6 @@ class irb120():
             last_time_step = point.time_from_start.to_sec
         return new_plan
 
-    def __transform_poses(self, target_frame, source_frame, pose_arr):
-        print("here")
-        trans_pose_arr = PoseArray()
-        for i in range(len(pose_arr.poses)):
-            trans_pose = PoseStamped()
-            pose = PoseStamped()
-            pose.header.frame_id = source_frame
-            pose.pose = pose_arr.poses[i]
-            self.transformer_listener.waitForTransform(
-                target_frame, source_frame, rospy.Time(), rospy.Duration(1))
-            trans_pose = self.transformer_listener.transformPose(
-                target_frame, pose)
-            trans_pose_arr.poses.append(trans_pose.pose)
-
-        trans_pose_arr.header.frame_id = target_frame
-        trans_pose_arr.header.stamp = rospy.Time()
-        return trans_pose_arr
-
     def measure_z(self, point_location, ref_frame="base_link", vel_scale=1, acc_scale=1, avoid_collisions=True, eef_step=0.0001, jump_threshold=0.0):
         # set the pose_arr reference frame
         self.group.set_pose_reference_frame(ref_frame)
@@ -317,7 +300,7 @@ class irb120():
         print(pose)
         pose_arr.header.frame_id = "tool0_comp"
         pose_arr.poses.append(pose)
-        tool_pose = self.__transform_poses("base_link", "tool0_comp", pose_arr)
+        tool_pose = transform_poses("base_link", "tool0_comp", pose_arr)
 
         return tool_pose.poses[0].position.z
 
@@ -342,15 +325,15 @@ class irb120():
 
     def cut_cb(self, contour_msg):
         self.working_flag = True
-        trans_poses = self.__transform_poses(
+        trans_poses = transform_poses(
             "base_link", "calibrated_frame", contour_msg)
-        # no_contours = len(contour_msg.poses) / 5
-        no_contours = 1
+        no_contours = len(contour_msg.poses) / 5
+        # no_contours = 1
         for i in range(no_contours):
             contour_to_cut = PoseArray()
             contour_to_cut.header = trans_poses.header
-            # contour_to_cut.poses = deepcopy(trans_poses.poses[i*5:i*5+5])
-            contour_to_cut.poses = deepcopy(trans_poses.poses[:])
+            contour_to_cut.poses = deepcopy(trans_poses.poses[i*5:i*5+5])
+            # contour_to_cut.poses = deepcopy(trans_poses.poses[:])
             # print contour_to_cut
             # raw_input()
             self.cut_contour_seq(contour_to_cut)
