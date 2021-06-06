@@ -19,13 +19,13 @@ class FlippingPlanner():
         trans_flip_data = transform_poses("base_link", "calibrated_frame", flip_data_msg)
         self.flip_point = trans_flip_data.poses[0]
         self.center_point = trans_flip_data.poses[1]
-        self.flip_radius = self.center_point.position.y - self.flip_point.position.y
-        y_arr, z_arr = sample_from_func(self.circle_func, self.flip_point.position.y, self.center_point.position.y + self.flip_dist, 20)
+        self.flip_radius = self.center_point.position.x - self.flip_point.position.x
+        x_arr, z_arr = sample_from_func(self.circle_func, self.flip_point.position.x, self.center_point.position.x + self.flip_dist, 20)
         plan = PoseArray()
-        for y, z in zip(y_arr, z_arr):
+        for x, z in zip(x_arr, z_arr):
             pose_goal = Pose()
-            pose_goal.position.x = self.flip_point.position.x
-            pose_goal.position.y = y
+            pose_goal.position.x = x
+            pose_goal.position.y = self.flip_point.position.y
             pose_goal.position.z = z
             # TODO: Adjust Quaternion values.
             pose_goal.orientation.x = 0
@@ -35,6 +35,6 @@ class FlippingPlanner():
             plan.poses.append(pose_goal)
         
     
-    def circle_func(self, y):
-        return sqrt(self.flip_radius**2 - (y - self.center_point.position.y)**2) + self.center_point.position.z
+    def circle_func(self, x):
+        return sqrt(self.flip_radius**2 - (x - self.center_point.position.x)**2) + self.center_point.position.z
         
