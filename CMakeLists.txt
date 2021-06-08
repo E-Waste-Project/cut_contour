@@ -67,7 +67,7 @@ add_action_files(
   DIRECTORY
   action
   FILES
-  MoveStraight.action
+  MoveStraight.action MeasureZ.action
 )
 
 ## Generate added messages and services with any dependencies listed here

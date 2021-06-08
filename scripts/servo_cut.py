@@ -172,7 +172,6 @@ class Subscribers():
         self.robot.group.go()
         
         # cutting tool on
-        self.cutting_tool.wait_for_service()
         cutting_tool_on = SetIOSignalRequest()
         cutting_tool_on.signal = "CuttingTool"
         cutting_tool_on.value = "1"

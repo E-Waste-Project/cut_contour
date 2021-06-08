@@ -9,164 +9,126 @@ from std_msgs.msg import Float64
 from math import fabs
 
 
-def transform_poses(target_frame, source_frame, pose_arr):
-    """
-    Transform poses from source_frame to target_frame
-    """
-    transformer_listener = tf.TransformListener()
-    trans_pose_arr = PoseArray()
-    for i in range(len(pose_arr.poses)):
-        trans_pose = PoseStamped()
-        pose = PoseStamped()
-        pose.header.frame_id = source_frame
-        pose.pose = pose_arr.poses[i]
-        transformer_listener.waitForTransform(
-            target_frame, source_frame, rospy.Time(), rospy.Duration(1))
-        trans_pose = transformer_listener.transformPose(
-            target_frame, pose)
-        trans_pose_arr.poses.append(trans_pose.pose)
-
-    trans_pose_arr.header.frame_id = target_frame
-    trans_pose_arr.header.stamp = rospy.Time()
-    return trans_pose_arr
 
 def sample_from_func(func, start, stop, number_of_points):
     func_input = np.linspace(start=start, stop=stop, num=number_of_points).tolist()
     func_output = [func(i) for i in func_input]
     return func_input, func_output
 
+def filter_plan(plan):
+    last_time_step = plan.joint_trajectory.points[0].time_from_start.to_sec
+    new_plan = RobotTrajectory()
+    new_plan.joint_trajectory.header = plan.joint_trajectory.header
+    new_plan.joint_trajectory.joint_names = plan.joint_trajectory.joint_names
+    new_plan.joint_trajectory.points.append(
+        plan.joint_trajectory.points[0])
+    for i in range(1, len(plan.joint_trajectory.points)):
+        point = plan.joint_trajectory.points[i]
+        if point.time_from_start.to_sec > last_time_step:
+            new_plan.joint_trajectory.points.append(point)
+        last_time_step = point.time_from_start.to_sec
+    return new_plan
+
+
+class TransformServices():
+    def __init__(self):
+        self.transformer_listener = tf.TransformListener()
+
+
+        
+    def transform_poses(self, target_frame, source_frame, pose_arr):
+        """
+        Transform poses from source_frame to target_frame
+        """
+        trans_pose_arr = PoseArray()
+        for i in range(len(pose_arr.poses)):
+            trans_pose = PoseStamped()
+            pose = PoseStamped()
+            pose.header.frame_id = source_frame
+            pose.pose = pose_arr.poses[i]
+            self.transformer_listener.waitForTransform(
+                target_frame, source_frame, rospy.Time(), rospy.Duration(1))
+            trans_pose = self.transformer_listener.transformPose(
+                target_frame, pose)
+            trans_pose_arr.poses.append(trans_pose.pose)
+
+        trans_pose_arr.header.frame_id = target_frame
+        trans_pose_arr.header.stamp = rospy.Time()
+        return trans_pose_arr
+    
+    def lookup_transform(self, target_frame, source_frame):
+        self.transformer_listener.waitForTransform(
+                target_frame, source_frame, rospy.Time(), rospy.Duration(1))
+        t, r = self.transformer_listener.lookupTransform(target_frame, source_frame, rospy.Time())
+        pose = Pose()
+        pose.position.x = t[0]
+        pose.position.y = t[1]
+        pose.position.z = t[2]
+        pose.orientation.x = r[0]
+        pose.orientation.y = r[1]
+        pose.orientation.z = r[2]
+        pose.orientation.w = r[3]
+        return pose
+
+
 class MotionServices():
-    def __init__(self, tool_group="cutting_tool") -> None:
+    def __init__(self, tool_group="cutting_tool"):
         self.move_group = MoveGroupCommander(tool_group)
         # TODO: Adjust quaternions of links
         self.tool_quat_base_link = [0, 1, 0, 0]
         self.tool_quat_table_link = [0.707, -0.707, 0.000, -0.000]
-        self.approach_dist = 0.01
-        self.retreat_feed_rate = 0.5
-        self.measure_z_feed_rate = 0.0005
-        self.retreat_dist = 0.03
-        self.z_to_measure = -0.03
-        self.force_z_threshold = 1.0
+        self.current_force_z = 0
+        self.current_force_xy = 0
+        rospy.Subscriber("ft_sensor_wrench/resultant/filtered", Float64, self.force_xy_cb)
+        rospy.Subscriber("ft_sensor_wrench/filtered_z", Float64, self.force_z_cb)
     
-    def approch_point(self, point_location, ref_frame="base_link"):
-
-        self.move_group.set_pose_reference_frame(ref_frame)
-        # approach
-        set_point = Pose()
-        set_point.position.x = point_location.position.x
-        set_point.position.y = point_location.position.y
-        set_point.position.z = point_location.position.z + self.approach_dist
-
-        quat = self.tool_quat_base_link
-
-        if ref_frame == "table_link":
-            quat = self.tool_quat_table_link
-
-        set_point.orientation.x = quat[0]
-        set_point.orientation.y = quat[1]
-        set_point.orientation.z = quat[2]
-        set_point.orientation.w = quat[3]
-
-        self.move_group.clear_pose_targets()
-        self.move_group.set_pose_target(set_point)
-        approach_result = self.move_group.go()
-        return approach_result
-    
-    def move_straight(self, point_location, z_dist=0, ref_frame="base_link", vel_scale=1, acc_scale=1, avoid_collisions=True, eef_step=0.0001, jump_threshold=0.0):
+    def move_straight(self, poses, ref_frame="base_link",
+                      vel_scale=0.005, acc_scale=0.005,
+                      avoid_collisions=True, eef_step=0.0001, jump_threshold=0.0,
+                      wait_execution=True):
         # set the pose_arr reference frame
         self.move_group.set_pose_reference_frame(ref_frame)
 
-        # compute the plan
-        goal_pose_arr = []
-        set_point = deepcopy(point_location)
-        set_point.position.x = point_location.position.x
-        set_point.position.y = point_location.position.y
-        set_point.position.z = point_location.position.z + z_dist
-
-        goal_pose_arr.append(set_point)
         plan, fraction = self.move_group.compute_cartesian_path(
-            goal_pose_arr, eef_step, jump_threshold, avoid_collisions)
-        print(fraction)
-
-        # filter the output plan
-        filtered_plan = self.__filter_plan(plan)
-        # filtered_plan = plan
-
-        # execute the filtered plan
-        final_traj = self.move_group.retime_trajectory(
-            self.move_group.get_current_state(), filtered_plan, vel_scale, acc_scale)
-        result = self.move_group.execute(final_traj)
-        return result
-    
-    def __filter_plan(self, plan):
-        last_time_step = plan.joint_trajectory.points[0].time_from_start.to_sec
-        new_plan = RobotTrajectory()
-        new_plan.joint_trajectory.header = plan.joint_trajectory.header
-        new_plan.joint_trajectory.joint_names = plan.joint_trajectory.joint_names
-        new_plan.joint_trajectory.points.append(
-            plan.joint_trajectory.points[0])
-        for i in range(1, len(plan.joint_trajectory.points)):
-            point = plan.joint_trajectory.points[i]
-            if point.time_from_start.to_sec > last_time_step:
-                new_plan.joint_trajectory.points.append(point)
-            last_time_step = point.time_from_start.to_sec
-        return new_plan
-    
-    def measure_z(self, point_location, ref_frame="base_link", vel_scale=1, acc_scale=1, avoid_collisions=True, eef_step=0.0001, jump_threshold=0.0):
-        # set the pose_arr reference frame
-        self.move_group.set_pose_reference_frame(ref_frame)
-
-        # compute the plan
-        goal_pose_arr = []
-        set_point = Pose()
-        set_point.position.x = point_location.position.x
-        set_point.position.y = point_location.position.y
-        set_point.position.z = point_location.position.z + self.z_to_measure
-
-        quat = self.tool_quat_base_link
-        if ref_frame == "table_link":
-            quat = self.tool_quat_table_link
-        set_point.orientation.x = quat[0]
-        set_point.orientation.y = quat[1]
-        set_point.orientation.z = quat[2]
-        set_point.orientation.w = quat[3]
-
-        goal_pose_arr.append(set_point)
-        plan, fraction = self.move_group.compute_cartesian_path(
-            goal_pose_arr, eef_step, jump_threshold, avoid_collisions)
+            poses.poses, eef_step, jump_threshold, avoid_collisions)
         print(fraction)
 
         # filter the output plan    def cut_cb(self, contour_msg):
-        filtered_plan = self.__filter_plan(plan)
-
-        # get the initial force
-        msg = rospy.wait_for_message("/ft_sensor_wrench/filtered_z", Float64)
-        init_force_z = msg.data
-        print("initial_force = ", init_force_z)
-
+        filtered_plan = filter_plan(plan)
+        
         # execute the filtered plan
         final_traj = self.move_group.retime_trajectory(
             self.move_group.get_current_state(), filtered_plan, vel_scale, acc_scale)
-        self.move_group.execute(final_traj, wait=False)
+        
+        result = self.move_group.execute(final_traj, wait_execution)
+        
+        return result
+    
+    def force_z_cb(self, msg):
+        self.current_force_z = msg.data
+    
+    def force_xy_cb(self, msg):
+        self.current_force_xy = msg.data
+    
+    def move_to_touch(self, poses, axis, force_thersh=0.5, ref_frame="base_link",
+                      vel_scale=0.005, acc_scale=0.005,
+                      avoid_collisions=True, eef_step=0.0001, jump_threshold=0.0):
 
-        current_force_z = init_force_z
-        change_force = fabs(current_force_z - init_force_z)
-        while change_force < self.force_z_threshold:
-            msg = rospy.wait_for_message(
-                "/ft_sensor_wrench/filtered_z", Float64)
-            current_force_z = msg.data
-            change_force = fabs(current_force_z - init_force_z)
-            print("change in force = ", change_force)
+        # get the initial force
+        init_force = self.current_force_xy if axis == 'z' else self.current_force_z
+        current_force = init_force
+        change_force = 0
+        # rospy.loginfo("initial_force = {}".format(init_force))
+        
+        # Move fast at first.
+        result = self.move_straight(poses, vel_scale=vel_scale, acc_scale=acc_scale, wait_execution=False)
 
+        # Monitor the force until it reaches force_thresh.
+        while change_force < force_thersh:
+            current_force = self.current_force_xy if axis == 'z' else self.current_force_z
+            change_force = fabs(current_force - init_force)
+            # rospy.loginfo("change in force = {}".format(change_force))
+        
+        # rospy.loginfo("Initial Time")
         self.move_group.stop()
-        # get the current z
-        pose_arr = PoseArray()
-        tool_pose = PoseArray()
-        pose = Pose()
-        print(pose)
-        pose_arr.header.frame_id = "tool0_comp"
-        pose_arr.poses.append(pose)
-        tool_pose = transform_poses("base_link", "tool0_comp", pose_arr)
-
-        return tool_pose.poses[0].position.z
     

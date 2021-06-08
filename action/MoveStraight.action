@@ -1,5 +1,5 @@
 # Define the goal
-geometry_msgs/PoseArray poses
+geometry_msgs/PoseArray pose_array
 string ref_frame
 bool avoid_collisions
 float32 eef_step
@@ -8,7 +8,7 @@ float32 vel_scale
 float32 acc_scale
 ---
 # Define the result
-bool done 
+bool done
 ---
 # Define a feedback message
 uint32 curr_pose_idx
