@@ -1,0 +1,14 @@
+<launch>
+
+    <include file="$(find abb_irb120_moveit_config)/launch/demo_ewaste.launch" />
+    <include file="$(find perception)/launch/camera_driver.launch" />
+    <include file="$(find abb_irb120_moveit_config)/launch/camera_calibration.launch" />
+    <!-- <node name="ft_sensor_driver" pkg="ft_sensor_driver" type="ft_sensor_driver.py" />
+    <node name="lp_filter" pkg="ft_sensor_driver" type="lp_filter.py" /> -->
+
+    <node name="pixel_to_point" pkg="perception" type="pointcloud_test.py" output="screen" />
+    <node name="motors_on" pkg="egm_config" type="start_robot.bash" output="screen" />
+
+    <!-- <node name="flipping_planner" pkg="cut_contour" type="flipping_planner.py" output="screen" /> -->
+
+</launch>
