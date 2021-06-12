@@ -1,4 +1,11 @@
-import numpy as np
+#!/usr/bin/env python
+import rospy
+from moveit_commander import MoveGroupCommander
+from moveit_msgs.msg import Constraints, PositionConstraint
 
-arr = np.array([[6, 7, 5], [6, 7, 5], [1, 7, 1], [6, 3, 4], [6, 8, 4]])
-print (np.argmin(arr[2, :]))
+rospy.init_node("test")
+group = MoveGroupCommander("camera_group")
+constraints = Constraints()
+# PositionConstraint().target_point_offset.
+# constraints.position_constraints.
+group.set_path_constraints()

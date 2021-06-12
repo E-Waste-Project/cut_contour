@@ -16,12 +16,13 @@ if __name__=="__main__":
     transformer_listener = tf.TransformListener()
     transformer_listener.waitForTransform("link_6", "calibrated_frame", rospy.Time(),rospy.Duration(10))
     transform = transformer_listener.lookupTransform("link_6", "calibrated_frame", rospy.Time())
-    eurler = euler_from_quaternion(transform[3:-1])
-    transformer_listener.transform
-    print(transform)
+    print (transform[1])
+    eurler = euler_from_quaternion(transform[1])
+    # transformer_listener.transform
+    # print(transform)
     print(eurler)
-    tf.TransformBroadcaster().sendTransform()
-    transformed_point = transformer_listener.transformPoint("base_link", point)
+    # tf.TransformBroadcaster().sendTransform()
+    # transformed_point = transformer_listener.transformPoint("base_link", point)
     # print(tf.TransformListener.allFramesAsString(transformer_listener))
-    print(transformed_point)
+    # print(transformed_point)
     

@@ -2,7 +2,7 @@
 
      <include file="$(find abb_irb120_moveit_config)/launch/demo_robothon.launch" />
      <include file="$(find perception)/launch/camera_driver.launch" />
-     <include file="$(find abb_irb120_moveit_config)/launch/camera_calibration.launch" />
+     <!-- <include file="$(find abb_irb120_moveit_config)/launch/camera_calibration.launch" /> -->
 
      <!-- <include file="$(find ft_sensor_driver)/launch/force_filtered.launch" />  -->
      <!-- <include file="$(find cut_contour)/launch/control.launch" />

@@ -2,7 +2,7 @@
 
     <include file="$(find abb_irb120_moveit_config)/launch/demo_ewaste.launch" />
     <include file="$(find perception)/launch/camera_driver.launch" />
-    <include file="$(find abb_irb120_moveit_config)/launch/camera_calibration.launch" />
+    <!-- <include file="$(find abb_irb120_moveit_config)/launch/camera_calibration.launch" /> -->
     <!-- <node name="ft_sensor_driver" pkg="ft_sensor_driver" type="ft_sensor_driver.py" />
     <node name="lp_filter" pkg="ft_sensor_driver" type="lp_filter.py" /> -->
 

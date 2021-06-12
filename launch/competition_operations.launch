@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<launch>
+    <node pkg="cut_contour" type="competition_operations.py" name="competition_operations" output="screen"/>
+    <include file="$(find ft_sensor_driver)/launch/force_filtered.launch" />
+</launch>
