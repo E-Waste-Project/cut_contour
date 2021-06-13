@@ -102,8 +102,7 @@ class MotionServices():
         # TODO: Adjust quaternions of links
         self.tool_quat_base_link = [0, 1, 0, 0]
         self.tool_quat_table_link = [0.707, -0.707, 0.000, -0.000]
-        self.current_force_z = 0
-        self.current_force_xy = 0
+        self.current_force = {'z': 0, 'xy': 0, 'x': 0}
         # rospy.Subscriber("ft_sensor_wrench/resultant/filtered", Float64, self.force_xy_cb)
         # rospy.Subscriber("ft_sensor_wrench/filtered_z", Float64, self.force_z_cb)
         rospy.Subscriber("ft_sensor_wrench/resultant/raw",
@@ -135,18 +134,18 @@ class MotionServices():
         return result
 
     def force_z_cb(self, msg):
-        # self.current_force_z = msg.data
-        self.current_force_z = msg.wrench.force.z
+        self.current_force['xy'] = msg.wrench.force.z
+        self.current_force['x'] = msg.wrench.force.x
 
     def force_xy_cb(self, msg):
-        self.current_force_xy = msg.data
+        self.current_force['z'] = msg.data
 
     def move_to_touch(self, poses, axis, force_thresh=0.5, ref_frame="base_link",
                       vel_scale=0.005, acc_scale=0.005,
                       avoid_collisions=True, eef_step=0.0001, jump_threshold=0.0):
 
         # get the initial force
-        init_force = self.current_force_xy if axis == 'z' else self.current_force_z
+        init_force = self.current_force[axis]
         current_force = init_force
         change_force = 0
         # rospy.loginfo("initial_force = {}".format(init_force))
@@ -157,7 +156,7 @@ class MotionServices():
 
         # Monitor the force until it reaches force_thresh.
         while change_force < force_thresh:
-            current_force = self.current_force_xy if axis == 'z' else self.current_force_z
+            current_force = self.current_force[axis]
             change_force = fabs(current_force - init_force)
             # rospy.loginfo("change in force = {}".format(change_force))
 
