@@ -24,7 +24,7 @@ class CompetitionOperations():
         self.camera_ms = MotionServices(tool_group="camera_group")
         self.tf_services = TransformServices()
         self.x_comp = -0.005 
-        self.y_comp = 0.002
+        self.y_comp = 0.0035
 
     def pb_cb(self, msg):
         rospy.loginfo("Recieved Message")
@@ -334,12 +334,12 @@ class CompetitionOperations():
         # Move upwards.
         battery_pose = self.tf_services.lookup_transform(
             "base_link", "gripper_battery")
-        battery_pose.position.z += 0.1
+        battery_pose.position.z += 0.05
         pose_array.poses = [battery_pose]
-        self.battery_ms.move_straight(pose_array, vel_scale=1, acc_scale=1)
+        result = self.battery_ms.move_straight(pose_array, vel_scale=0.01, acc_scale=0.01)
         print("Moved Upwards!!!")
-
-        rospy.sleep(1)
+        if not result:
+            rospy.sleep(5)
     
         # Orient the battery move_group to make the battery vertical.
         # pose_array = self.battery_ms.shift_pose_by(
@@ -350,7 +350,7 @@ class CompetitionOperations():
         self.battery_ms.move_group.go()
         print("Oriented to battery Orientation to Vertical!!!!")
 
-        rospy.sleep(1)
+        rospy.sleep(5)
 
         # publish done msgmsgne"
         pb_done_msg = String()
@@ -372,27 +372,32 @@ class CompetitionOperations():
         # Move above hole with a safe distance
         pose_array = PoseArray()
         pose_array.poses.append(deepcopy(spiral_array.poses[0]))
-        pose_array.poses[0].position.z += 0.04
-        self.battery_ms.move_straight(pose_array, vel_scale=1, acc_scale=1)
+        pose_array.poses[0].position.z += 0.05
+        self.battery_ms.move_straight(pose_array, vel_scale=0.1, acc_scale=0.1)
         print("Moved to Pose within safe distance")
 
-        rospy.sleep(1)
+        rospy.sleep(5)
 
         # Move vertically down to touch
-        pose_array.poses[0].position.z -= 0.05
+        pose_array.poses[0].position.z -= 0.07
         self.battery_ms.move_to_touch(pose_array, axis='z', force_thresh=5)
+        print("Touched!!!!!")
         
-        rospy.sleep(1)
+        rospy.sleep(5)
         
+        print("Start Spiral!!!!")
         # Move spirally until sudden change in z force.
+        gripper_pose = self.tf_services.lookup_transform("base_link", "gripper_battery")
+        for pose in spiral_array.poses:
+            pose.position.z = gripper_pose.position.z
         self.battery_ms.move_to_touch(spiral_array, axis='z', force_thresh=3)
         
-        rospy.sleep(1)
+        rospy.sleep(5)
         
         # Open the Gripper
         self.battery_ms.change_tool_status("Robothon_EE", status=0)
 
-        rospy.sleep(1)
+        rospy.sleep(5)
 
         # publish done msgmsgne"
         pb_done_msg = String()
@@ -416,7 +421,7 @@ class CompetitionOperations():
         pose_array.poses[0].orientation = gripper_battery_pose.orientation
         self.battery_ms.move_group.set_pose_reference_frame(pose_array.header.frame_id)
         self.battery_ms.move_group.set_pose_target(pose_array.poses[0])
-        self.battery_ms.move_group.set_path_constraints()
+        # self.battery_ms.move_group.set_path_constraints()
         self.battery_ms.move_group.go()
         # self.battery_ms.move_straight(pose_array, vel_scale=1, acc_scale=1)
         print("Moved to Pose within safe distance")
