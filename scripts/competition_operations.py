@@ -80,14 +80,18 @@ class CompetitionOperations():
         pose_array.poses[0].orientation.y = q[1]
         pose_array.poses[0].orientation.z = q[2]
         pose_array.poses[0].orientation.w = q[3]
-        self.pb_cover_ms.move_straight(pose_array, vel_scale=1, acc_scale=1)
+        self.pb_cover_ms.move_group.clear_pose_targets()
+        self.pb_cover_ms.move_group.set_pose_reference_frame("base_link")
+        self.pb_cover_ms.move_group.set_pose_target(pose_array.poses[0])
+        self.pb_cover_ms.move_group.go()
+        # self.pb_cover_ms.move_straight(pose_array, vel_scale=1, acc_scale=1)
 
         # move to push the button
         pb_pose = self.tf_services.lookup_transform(
             "base_link", "gripper_pb_cover")
         pb_pose.position.z -= 0.1
         pose_array.poses[0] = pb_pose
-        self.pb_cover_ms.move_to_touch(pose_array, axis='xy', force_thresh=3)
+        self.pb_cover_ms.move_to_touch(pose_array, axis='xy', force_thresh=5)
         rospy.loginfo("Pushed !!!!")
 
         rospy.sleep(5)
@@ -118,7 +122,7 @@ class CompetitionOperations():
         pose_array = PoseArray()
         cover_pose.position.z -= 0.02
         cover_pose.position.y += self.y_comp
-        cover_pose.position.x += self.x_comp + 0.003
+        cover_pose.position.x += self.x_comp + 0.004
         q = [cover_pose.orientation.x, cover_pose.orientation.y,
              cover_pose.orientation.z, cover_pose.orientation.w]
         angles = euler_from_quaternion(q)
@@ -145,7 +149,11 @@ class CompetitionOperations():
         pose_array.poses[0].orientation.y = q[1]
         pose_array.poses[0].orientation.z = q[2]
         pose_array.poses[0].orientation.w = q[3]
-        self.pb_cover_ms.move_straight(pose_array, vel_scale=1, acc_scale=1)
+        self.pb_cover_ms.move_group.clear_pose_targets()
+        self.pb_cover_ms.move_group.set_pose_reference_frame("base_link")
+        self.pb_cover_ms.move_group.set_pose_target(pose_array.poses[0])
+        self.pb_cover_ms.move_group.go()
+        # self.pb_cover_ms.move_straight(pose_array, vel_scale=1, acc_scale=1)
 
         # move to touch on the cover
         cover_pose = self.tf_services.lookup_transform(
@@ -214,7 +222,7 @@ class CompetitionOperations():
         pose_array.poses.append(battery_pose)
         pose_array = self.tf_services.transform_poses(
             "base_link", "capture_frame", pose_array)
-        pose_array.poses[0].position.z += 0.05
+        pose_array.poses[0].position.z += 0.02
         q = [pose_array.poses[0].orientation.x, pose_array.poses[0].orientation.y,
              pose_array.poses[0].orientation.z, pose_array.poses[0].orientation.w]
         angles = euler_from_quaternion(q)
@@ -232,8 +240,13 @@ class CompetitionOperations():
         print("Battery Pose After Modification = ", pose_array.poses[0])
 
         # move to battery pose.
-        self.battery_picker_ms.move_straight(
-            pose_array, vel_scale=1, acc_scale=1)
+        self.battery_picker_ms.move_group.set_pose_reference_frame(
+            pose_array.header.frame_id)
+        self.battery_picker_ms.move_group.clear_pose_targets()
+        self.battery_picker_ms.move_group.set_pose_target(pose_array.poses[0])
+        self.battery_picker_ms.move_group.go()
+        # self.battery_picker_ms.move_straight(
+            # pose_array, vel_scale=1, acc_scale=1)
 
         print("Moved to Battery Pose")
 
@@ -552,8 +565,6 @@ class CompetitionOperations():
         self.battery_ms.change_tool_status("Robothon_EE", status=0)
 
         rospy.sleep(1)
-
-        # publish done msgmsgne"
         pb_done_msg = String()
         pb_done_msg.data = "done"
         self.done_pub.publish(pb_done_msg)
@@ -615,7 +626,7 @@ class CompetitionOperations():
         ethernet_pose.position.z += 0.003
         ethernet_array.poses = [ethernet_pose]
         result = self.ethernet_ms.move_straight(
-            ethernet_array, vel_scale=0.01, acc_scale=0.01)
+            ethernet_array, vel_scale=1, acc_scale=1)
         print("Moved Upwards!!!")
         if not result:
             rospy.sleep(5)
@@ -720,17 +731,17 @@ class CompetitionOperations():
         gripper_ethernet_pose = self.tf_services.lookup_transform(
             "base_link", "gripper_ethernet")
         init_z = gripper_ethernet_pose.position.z
-        while fabs(gripper_ethernet_pose.position.z - init_z) < 0.01:
+        while fabs(gripper_ethernet_pose.position.z - init_z) <= 0.003:
             for pose in pose_array.poses:
                 pose.position.z = gripper_ethernet_pose.position.z
                 pose.orientation = ethernet_pose.orientation
             # Move spirally until sudden change in z force.
             self.ethernet_ms.move_to_touch(
-                pose_array, axis='xy', force_thresh=4)
+                pose_array, axis='xy', force_thresh=9, vel_scale=1, acc_scale=1)
             # move upwards
             ethernet_pose = self.tf_services.lookup_transform(
                 "base_link", "gripper_ethernet")
-            ethernet_pose.position.z += 0.003
+            ethernet_pose.position.z += 0.001
             ethernet_array = PoseArray()
             ethernet_array.poses.append(ethernet_pose)
             result = self.ethernet_ms.move_straight(
@@ -745,7 +756,7 @@ class CompetitionOperations():
             ethernet_array.poses.append(ethernet_pose)
             ethernet_array.poses[0].position.z -= 0.02
             self.ethernet_ms.move_to_touch(
-                ethernet_array, axis='xy', force_thresh=5)
+                ethernet_array, axis='xy', force_thresh=10)
             gripper_ethernet_pose = self.tf_services.lookup_transform(
                 "base_link", "gripper_ethernet")
 
