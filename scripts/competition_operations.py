@@ -23,7 +23,7 @@ class CompetitionOperations():
                          PoseArray, self.ethernet_empty_spiral_cb)
         rospy.Subscriber("/ethernet_topic", PoseArray, self.ethernet_cb)
         rospy.Subscriber("/key_topic", Pose, self.key_cb)
-        rospy.Subscriber("/key_hole_topic", Pose, self.key_hole_cb)
+        rospy.Subscriber("/key_hole_spiral_topic", PoseArray, self.key_hole_spiral_cb)
         rospy.Subscriber("/board_state_topic", String, self.flip_cb)
         self.capture_pub = rospy.Publisher(
             "/capture_state", String, queue_size=1)
@@ -679,7 +679,7 @@ class CompetitionOperations():
 
         rospy.sleep(1)
 
-        # publish done msgmsgne"
+        # publish done msg
         pb_done_msg = String()
         pb_done_msg.data = "done"
         self.done_pub.publish(pb_done_msg)
@@ -823,8 +823,10 @@ class CompetitionOperations():
 
     def key_cb(self, msg):
         key_pose = msg
+        # key_pose.position.x -= 0.003
         # key_pose.position.x += self.x_comp
         key_pose.position.y += self.y_comp
+
 
         # transform key from capture frame to base link
         pose_array = PoseArray()
@@ -881,7 +883,7 @@ class CompetitionOperations():
         pose_array = PoseArray()
         pose_array.poses.append(gripper_key_pose)
 
-        pose_array.poses[0].position.z += 0.003
+        pose_array.poses[0].position.z += 0.005
         result = self.key_ms.move_straight(
             pose_array, vel_scale=0.01, acc_scale=0.01)
         print("Ready to Pick the Key!!!")
@@ -905,59 +907,50 @@ class CompetitionOperations():
 
         rospy.sleep(1)
 
-        # # move left to drop the key
-        # pose_array.poses[0].position.y += 0.1
-        # result = self.key_ms.move_straight(
-        #     pose_array, vel_scale=0.01, acc_scale=0.01)
-        # print("Moved To Key!!!")
-        # if not result:
-        #    print("Went to The Center X Y") rospy.sleep(5)
-
-        # rospy.sleep(1)
-
-        # # open the gripper
-        # self.key_ms.change_tool_status("Robothon_EE", status=0)
-
-        rospy.sleep(1)
-
         # publish done msgmsgne"
         pb_done_msg = String()
         pb_done_msg.data = "done"
         self.done_pub.publish(pb_done_msg)
     
-    def key_hole_cb(self, msg):
+
+    def key_hole_spiral_cb(self, msg):
         # go to the key hole pose
-        key_hole_x_comp = 0.005       
-        key_hole_y_comp = 0.007
-        key_hole_pose = msg
-        key_hole_pose.position.x += self.x_comp + key_hole_x_comp
-        key_hole_pose.position.y += self.y_comp + key_hole_y_comp
-
+        key_hole_x_comp = 0.004       
+        key_hole_y_comp = 0.002
+        key_spiral_poses = msg
+        for pose in key_spiral_poses.poses:
+            pose.position.x += self.x_comp + key_hole_x_comp
+            pose.position.y += self.y_comp + key_hole_y_comp
+        key_hole_pose = key_spiral_poses.poses[0]
         # transform key from capture frame to base link
-        pose_array = PoseArray()
-        pose_array.poses.append(deepcopy(key_hole_pose))
+        # pose_array = PoseArray()
+        # pose_array.poses.append(deepcopy(key_hole_pose))
           
-        pose_array = self.tf_services.transform_poses(
-            "base_link", "capture_frame", pose_array)
+        key_spiral_poses = self.tf_services.transform_poses(
+            "base_link", "capture_frame", key_spiral_poses)
 
-        q = [pose_array.poses[0].orientation.x, pose_array.poses[0].orientation.y,
-             pose_array.poses[0].orientation.z, pose_array.poses[0].orientation.w]
+        k_pose = key_spiral_poses.poses[0]
+        q = [k_pose.orientation.x, k_pose.orientation.y,
+             k_pose.orientation.z, k_pose.orientation.w]
         angles = euler_from_quaternion(q)
         angles = list(angles)
         angles[0] = pi
         angles[1] = 0
         angles[2] = angles[2] - pi/2
         q = quaternion_from_euler(angles[0], angles[1], angles[2])
-        pose_array.poses[0].orientation.x = q[0]
-        pose_array.poses[0].orientation.y = q[1]
-        pose_array.poses[0].orientation.z = q[2]
-        pose_array.poses[0].orientation.w = q[3]
+        for pose in key_spiral_poses.poses:
+            pose.orientation.x = q[0]
+            pose.orientation.y = q[1]
+            pose.orientation.z = q[2]
+            pose.orientation.w = q[3]
 
-        # Key Array
+        # Key Array[0
         key_hole_array = PoseArray()
-        key_hole_array = deepcopy(pose_array)
-        7
+        key_hole_array = deepcopy(key_spiral_poses)
+        pose_array = PoseArray()
+        pose_array.poses.append(deepcopy(key_hole_array.poses[0]))
         pose_array.poses[0].position.z += 0.06
+        pose_array.header.frame_id = "base_link"
         self.key_ms.move_group.set_pose_reference_frame(
             pose_array.header.frame_id)
         self.key_ms.move_group.set_pose_target(pose_array.poses[0])
@@ -966,110 +959,30 @@ class CompetitionOperations():
         
         # approach the key hole
         pose_array = PoseArray()
-        pose_array = deepcopy(key_hole_array)
-        pose_array.poses[0].position.z -= 0.01
-        self.key_ms.move_to_touch(
-            pose_array, vel_scale=0.01, acc_scale=0.01, axis='xy', force_thresh=1)
-        print("Touch Key Hole Surface!!!")
+        pose_array.header.frame_id = "base_link"
+        pose_array.poses.append(deepcopy(key_hole_array.poses[0]))
+        pose_array.poses[0].position.z -= 0.005
+        result = self.key_ms.move_to_touch(
+            pose_array, vel_scale=0.01, acc_scale=0.01, axis='xy', force_thresh=8)
+        arm = self.key_ms.current_arm['y']
+        print("Result = ", result)
+        print("Touched Key Hole Surface!!!")
 
         rospy.sleep(1)
         
+        current_pose = self.tf_services.lookup_transform("base_link", "gripper_key")
+        for pose in key_spiral_poses.poses:
+            pose.position.z = current_pose.position.z
         
-        print("Start Scaning")
-        # scan in +y axis       
-        pose_array = self.key_ms.shift_pose_by(
-            tf_services=self.tf_services, ref_frame="base_link", moving_frame="gripper_key",
-            trans=[0.0, 0.08, -0.001], new_frame="key_hole_fixed_frame")
-
-        self.key_ms.move_to_touch(
-            pose_array, axis='y', force_thresh=3.5, ref_frame=pose_array.header.frame_id)
-        
-        print("First Side Touched")
-        
-        gripper_key_pose = self.tf_services.lookup_transform(
-            "key_hole_fixed_frame", "gripper_key")
-        
-        y1 = gripper_key_pose.position.y
-        
-        rospy.sleep(1)
-        # scan in -y axis       
-        pose_array.poses[0].position.y = -0.08
-        self.key_ms.move_to_touch(
-            pose_array, axis='y', force_thresh=4, ref_frame=pose_array.header.frame_id)
-        
-        print("Second Side Touched")
-        gripper_key_pose = self.tf_services.lookup_transform(
-            "key_hole_fixed_frame", "gripper_key")
-        
-        y2 = gripper_key_pose.position.y
-        
-        center_y = (y1 + y2) / 2
-        
-        # go to the center Y
-        pose_array.poses[0].position.y = center_y
-        result = self.key_ms.move_straight(
-            pose_array, vel_scale=0.01, acc_scale=0.01, ref_frame=pose_array.header.frame_id)
-        print("Went to Center Y")
-        
-        # TODO: Move to touch to start from the beginning of the grove
-        pose_array = self.key_ms.shift_pose_by(
-            tf_services=self.tf_services, ref_frame="base_link", moving_frame="gripper_key",
-            trans=[0, 0.0, 0.0015], new_frame="key_hole_grove_frame_1")
-        result = self.key_ms.move_straight(
-            pose_array, vel_scale=0.01, acc_scale=0.01, ref_frame=pose_array.header.frame_id)
-
-        pose_array = self.key_ms.shift_pose_by(
-            tf_services=self.tf_services, ref_frame="base_link", moving_frame="gripper_key",
-            trans=[0.08, 0.0, 0], new_frame="key_hole_grove_frame_1")
-
-        self.key_ms.move_to_touch(
-            pose_array, axis='x', force_thresh=2, ref_frame=pose_array.header.frame_id)
-        
-        # pose_array = self.key_ms.shift_pose_by(
-        #     tf_services=self.tf_services, ref_frame="base_link", moving_frame="gripper_key",
-        #     trans=[-0.05, 0.0, 0.0], new_frame="key_hole_grove_frame_2")
-
-        # self.key_ms.move_to_touch(
-        #     pose_array, axis='xy', force_thresh=3, ref_frame=pose_array.header.frame_id)
-        
-        # pose_array = self.key_ms.shift_pose_by(
-        #     tf_services=self.tf_services, ref_frame="base_link", moving_frame="gripper_key",
-        #     trans=[0.0, 0.0, 0.01], new_frame="key_hole_grove_frame_3")
-
-        # self.key_ms.move_to_touch(
-        #     pose_array, axis='xy', force_thresh=2, ref_frame=pose_array.header.frame_id)
-        
-        print("Went to The Grove")        
-       
-
-        # go to the center in X and Y By Searhing Linearly
-        # pose_array = self.key_ms.shift_pose_by(
-        #     tf_services=self.tf_services, ref_frame="base_link", moving_frame="gripper_key",
-        #     trans=[-0.001, 0.0, -0.003], neposew_frame="key_hole_center_frame")
-        
-        x_step = 0.0005
-        x_step = x_step if self.flipped else -x_step
-        x_distance = 0.02
-        n_steps = int(x_distance // fabs(x_step))
-        step_array = self.key_ms.shift_pose_by(
-            tf_services=self.tf_services, ref_frame="base_link", moving_frame="gripper_key",
-            trans=[0, 0, 0], new_frame="key_hole_step_frame")
-        for i in range(n_steps):
-            pose = deepcopy(step_array.poses[i])
-            pose.position.x += x_step
-            step_array.poses.append(pose)
-        step_array.header.frame_id = "gripper_key"
-        print("Start Hole Search!!!!")
-        self.key_ms.hole_search(self.tf_services, init_z=0, pose_array=step_array,
-                                z_thresh=0.01, z_upper=-0.002, z_lower=0.05,
-                                force_thresh=8, axis='xy', ref_frame="key_hole_step_frame",
-                                vel_scale=0.01, acc_scale=0.01)
-        rospy.sleep(1)        
-        
-
-        # self.key_ms.move_to_touch(
-        #     pose_array, axis='x', force_thresh=2, ref_frame=pose_array.header.frame_id)
-        # print("Went to The Center X Y")        
+        key_spiral_poses.header.frame_id = "gripper_key"
+        if result != 3:
+            print("Start Hole Search!!!!")
+            self.key_ms.hole_search(self.tf_services, init_z=current_pose.position.z, pose_array=key_spiral_poses,
+                                    z_thresh=0.01, z_upper=0.003, z_lower=-0.05,
+                                    force_thresh=8, axis='xy', ref_frame="base_link",
+                                    vel_scale=0.01, acc_scale=0.01)
+            rospy.sleep(1)        
+         
         
         
         print("Start Inserting The Key")        
@@ -1081,9 +994,50 @@ class CompetitionOperations():
         self.key_ms.move_to_touch(
             pose_array, axis='xy', force_thresh=10, ref_frame=pose_array.header.frame_id)
         
+        key_center_correction = 0.002
+        print("arm = ", arm)
+        if arm < -0.1 or arm > 0.1:
+            if arm < 0:
+                key_center_correction *= -1
+            # Open the gripper
+            self.key_ms.change_tool_status("Robothon_EE", status=0)
+            rospy.sleep(1)
+            # correct position
+            pose_array = self.key_ms.shift_pose_by(self.tf_services, "base_link", "gripper_key", trans=(-0.002, 0, 0))
+            self.key_ms.move_straight(pose_array, "new_frame", vel_scale = 1, acc_scale = 1)
+            rospy.sleep(1)
+            # close the gripper
+            self.key_ms.change_tool_status("Robothon_EE", status=1)
+            rospy.sleep(1)
         
         # Open the gripper
         self.key_ms.change_tool_status("Robothon_EE", status=0)
+        rospy.sleep(1)
+        # move_up
+        pose_array = self.key_ms.shift_pose_by(self.tf_services, "base_link", "gripper_key", trans=(0, 0, -0.002))
+        self.key_ms.move_straight(pose_array, "new_frame", vel_scale = 1, acc_scale = 1)
+        rospy.sleep(1)
+        # close the gripper
+        self.key_ms.change_tool_status("Robothon_EE", status=1)
+        rospy.sleep(1)
+        
+        # rotate key
+        pose_array = self.key_ms.shift_pose_by(self.tf_services, "base_link", "gripper_key", rot=(0, 0, 48 * pi / 180.0))
+        self.key_ms.move_straight(pose_array, "new_frame", vel_scale=0.1, acc_scale=0.1)    
+        # self.key_ms.move_to_touch(pose_array, "new_frame", axis='z', force_thresh=0.01)
+        
+        rospy.sleep(1)
+        
+        # rotate key
+        pose_array = self.key_ms.shift_pose_by(self.tf_services, "base_link", "gripper_key", rot=(0, 0, -48 * pi / 180.0))
+        self.key_ms.move_straight(pose_array, "new_frame", vel_scale=0.1, acc_scale=0.1)  
+        
+        rospy.sleep(1)
+        
+        # Open the gripper
+        self.key_ms.change_tool_status("Robothon_EE", status=0)
+        
+        rospy.sleep(1)
         
         # Return to Capture Pose
         capture_pose = self.tf_services.lookup_transform(

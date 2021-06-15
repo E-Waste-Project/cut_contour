@@ -104,6 +104,8 @@ class MotionServices():
         self.tool_quat_base_link = [0, 1, 0, 0]
         self.tool_quat_table_link = [0.707, -0.707, 0.000, -0.000]
         self.current_force = {'z': 0, 'xy': 0, 'x': 0, 'y': 0}
+        self.current_torque = {'z': 0, 'xy': 0, 'x': 0, 'y': 0}
+        self.current_arm = {'x' : 0, 'y': 0, 'z': 0}
         # rospy.Subscriber("ft_sensor_wrench/resultant/filtered", Float64, self.force_xy_cb)
         # rospy.Subscriber("ft_sensor_wrench/filtered_z", Float64, self.force_z_cb)
         rospy.Subscriber("ft_sensor_wrench/resultant/raw",
@@ -140,6 +142,10 @@ class MotionServices():
         self.current_force['xy'] = msg.wrench.force.z
         self.current_force['x'] = msg.wrench.force.x
         self.current_force['y'] = msg.wrench.force.y
+        self.current_torque['x'] = msg.wrench.torque.x
+        self.current_torque['y'] = msg.wrench.torque.y
+        self.current_torque['z'] = msg.wrench.torque.z
+        self.current_arm['y'] = self.current_torque['y'] / self.current_force['z']
 
     def force_xy_cb(self, msg):
         self.current_force['z'] = msg.data
@@ -191,6 +197,8 @@ class MotionServices():
         current_pose = tf_services.lookup_transform(ref_frame, moving_frame)
         pose_idx = 0
         array_sz = len(pose_array.poses)
+        print("current_z = ", current_pose.position.z)
+        print("init_z = ", init_z)
         while fabs(current_pose.position.z - init_z) <= z_thresh and pose_idx < array_sz:
             
             # move above next spiral position

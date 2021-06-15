@@ -521,6 +521,32 @@ class CompetitionOperations():
         # Open Gripper
         self.battery_ms.change_tool_status(status=0, signal="Robothon_EE")
 
+        # move upwards
+        pose = self.tf_services.lookup_transform(
+            "base_link", "gripper_battery")
+        pose_array = PoseArray()
+        pose_array.poses.append(pose)
+        pose_array.poses[0].position.z += 0.03
+        self.battery_ms.move_straight(pose_array, vel_scale=0.1, acc_scale=0.1)
+
+        # close the gripper
+        self.battery_ms.change_tool_status(status=0, signal="Robothon_EE")
+
+        # move to touch the battery
+        pose = self.tf_services.lookup_transform(
+            "base_link", "gripper_battery")
+        pose_array = PoseArray()
+        pose_array.poses.append(pose)
+        pose_array.poses[0].position.z -= 0.05
+        self.battery_ms.move_to_touch(spiral_array, axis='z', force_thresh=4)
+        # move upwards
+        pose = self.tf_services.lookup_transform(
+            "base_link", "gripper_battery")
+        pose_array = PoseArray()
+        pose_array.poses.append(pose)
+        pose_array.poses[0].position.z += 0.03
+        self.battery_ms.move_straight(pose_array, vel_scale=0.1, acc_scale=0.1)
+
         # Return to Capture Pose
         capture_pose = self.tf_services.lookup_transform(
             "base_link", "capture_frame")
@@ -583,7 +609,7 @@ class CompetitionOperations():
             pose.position.x += self.x_comp
             pose.position.y += self.y_comp
 
-        pose_array.poses[1].position.x += 0.005
+        # pose_array.poses[1].position.x += 0.005
 
         # go to ethernet empty pose
         pose_array = self.tf_services.transform_poses(
@@ -596,12 +622,14 @@ class CompetitionOperations():
         print(angles)
         angles[0] = pi
         angles[1] = 0
-        angles[2] = angles[2] if self.flipped else angles[2] + pi
+        angles[2] = angles[2] + pi if self.flipped else angles[2]
         q = quaternion_from_euler(angles[0], angles[1], angles[2])
-        pose_array.poses[0].orientation.x = q[0]
-        pose_array.poses[0].orientation.y = q[1]
-        pose_array.poses[0].orientation.z = q[2]
-        pose_array.poses[0].orientation.w = q[3]
+        for pose in pose_array.poses:
+            pose.orientation.x = q[0]
+            pose.orientation.y = q[1]
+            pose.orientation.z = q[2]
+            pose.orientation.w = q[3]
+
         pose_array.poses[1].orientation = pose_array.poses[0].orientation
         self.ethernet_ms.move_group.set_pose_reference_frame(
             pose_array.header.frame_id)
@@ -622,6 +650,7 @@ class CompetitionOperations():
         # Move up a bit.
         ethernet_pose = self.tf_services.lookup_transform(
             "base_link", "gripper_ethernet")
+
         # adjust all poses depth to have the actual measured depth
         for pose in pose_array.poses:
             pose.position.z = ethernet_pose.position.z
