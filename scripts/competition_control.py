@@ -23,7 +23,7 @@ class Motion():
         self.state_publisher = rospy.Publisher(
             "/capture_state", String, queue_size=1)
         
-        rospy.Subscriber("/desired_pose", PoseStamped, self.desired_pose_cb)
+        rospy.Subscriber("/desired_pose_topic", PoseStamped, self.desired_pose_cb)
         
         #send forst message
         rospy.sleep(2)

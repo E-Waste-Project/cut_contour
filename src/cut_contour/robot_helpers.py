@@ -10,6 +10,7 @@ from std_msgs.msg import Float64
 from math import fabs
 from tf.transformations import quaternion_from_euler, euler_from_quaternion
 from abb_robot_msgs.srv import SetIOSignal, SetIOSignalRequest
+from moveit_msgs.msg import ExecuteTrajectoryActionResult
 
 
 def sample_from_func(func, start, stop, number_of_points):
@@ -102,21 +103,23 @@ class MotionServices():
         # TODO: Adjust quaternions of links
         self.tool_quat_base_link = [0, 1, 0, 0]
         self.tool_quat_table_link = [0.707, -0.707, 0.000, -0.000]
-        self.current_force = {'z': 0, 'xy': 0, 'x': 0}
+        self.current_force = {'z': 0, 'xy': 0, 'x': 0, 'y': 0}
         # rospy.Subscriber("ft_sensor_wrench/resultant/filtered", Float64, self.force_xy_cb)
         # rospy.Subscriber("ft_sensor_wrench/filtered_z", Float64, self.force_z_cb)
         rospy.Subscriber("ft_sensor_wrench/resultant/raw",
                          Float64, self.force_xy_cb)
         rospy.Subscriber("ft_sensor_wrench/wrench/raw",
                          WrenchStamped, self.force_z_cb)
+        rospy.Subscriber("/execute_trajectory/result", ExecuteTrajectoryActionResult, self.goal_status_cb)
         self.tool = rospy.ServiceProxy(
             "/rws/set_io_signal", SetIOSignal)
+        self.goal_status = None
 
     def move_straight(self, poses, ref_frame="base_link",
                       vel_scale=0.005, acc_scale=0.005,
                       avoid_collisions=True, eef_step=0.0001, jump_threshold=0.0,
                       wait_execution=True):
-        # set the pose_arr reference frame
+        # set the pose_arr referef_framerence frame
         self.move_group.set_pose_reference_frame(ref_frame)
 
         plan, fraction = self.move_group.compute_cartesian_path(
@@ -136,13 +139,19 @@ class MotionServices():
     def force_z_cb(self, msg):
         self.current_force['xy'] = msg.wrench.force.z
         self.current_force['x'] = msg.wrench.force.x
+        self.current_force['y'] = msg.wrench.force.y
 
     def force_xy_cb(self, msg):
         self.current_force['z'] = msg.data
+    
+    def goal_status_cb(self, msg):
+        # status = 2 means "Preempted" i.e. We stopped in the middle of motion.
+        # status = 3 means "Solution was found and executed." i.e. Motion completed successfully.
+        self.goal_status = msg.status.status
 
     def move_to_touch(self, poses, axis, force_thresh=0.5, ref_frame="base_link",
                       vel_scale=0.005, acc_scale=0.005,
-                      avoid_collisions=True, eef_step=0.0001, jump_threshold=0.0):
+                      avoid_collisions=True, eef_step=0.0001, jump_threshold=0.0, dist_thresh=None):
 
         # get the initial force
         init_force = self.current_force[axis]
@@ -150,18 +159,68 @@ class MotionServices():
         change_force = 0
         # rospy.loginfo("initial_force = {}".format(init_force))
 
+        # Reset goal status
+        self.goal_status = -1
+        
         # Move fast at first.
         result = self.move_straight(
             poses, vel_scale=vel_scale, acc_scale=acc_scale, wait_execution=False, ref_frame=ref_frame)
 
         # Monitor the force until it reaches force_thresh.
-        while change_force < force_thresh:
+        while change_force < force_thresh and self.goal_status != 3:
             current_force = self.current_force[axis]
             change_force = fabs(current_force - init_force)
             # rospy.loginfo("change in force = {}".format(change_force))
 
         # rospy.loginfo("Initial Time")
-        self.move_group.stop()
+        if self.goal_status != 3:
+            self.move_group.stop()
+        
+        # wait a bit for goal status to be updated in case of preempted.
+        rospy.sleep(0.1)
+        
+        # goal_status = -1 means it wasn't updated.
+        # goal_status = 2 means "Preempted" i.e. We stopped in the middle of motion.
+        # goal_status = 3 means "Solution was found and executed." i.e. Motion completed successfully.
+        return self.goal_status
+
+    
+    def hole_search(self, tf_services, init_z, pose_array, z_thresh=0.003, z_upper=0.002, z_lower=0.05,
+                    force_thresh=3, axis='xy', ref_frame="base_link", vel_scale=1, acc_scale=1):
+        moving_frame = pose_array.header.frame_id
+        current_pose = tf_services.lookup_transform(ref_frame, moving_frame)
+        pose_idx = 0
+        array_sz = len(pose_array.poses)
+        while fabs(current_pose.position.z - init_z) <= z_thresh and pose_idx < array_sz:
+            
+            # move above next spiral position
+            spiral_array = PoseArray()
+            spiral_array.poses.append(deepcopy(pose_array.poses[pose_idx]))
+            spiral_array.poses[0].position.z += z_upper
+            self.move_straight(spiral_array, vel_scale=vel_scale, acc_scale=acc_scale, ref_frame=ref_frame)
+            
+            print("moved up")
+            
+            # move to touch at next spiral position
+            current_pose = tf_services.lookup_transform(
+                ref_frame, moving_frame)
+            current_pose.position.z += z_lower
+            ethernet_array = PoseArray()
+            ethernet_array.poses.append(current_pose)
+            self.move_to_touch(
+                ethernet_array, axis=axis, force_thresh=force_thresh, ref_frame=ref_frame)
+            
+            print("touched down")
+
+
+            current_pose = tf_services.lookup_transform(
+                ref_frame, moving_frame)
+            pose_idx += 1
+
+        if pose_idx >= array_sz:
+            print("couldn't insert the Ethernet")
+            return
+    
 
     def shift_pose_by(self, tf_services, ref_frame, moving_frame, new_frame="new_frame", trans=(0, 0, 0), rot=(0, 0, 0)):
         pose_array = PoseArray()
