@@ -145,7 +145,7 @@ class MotionServices():
         self.current_torque['x'] = msg.wrench.torque.x
         self.current_torque['y'] = msg.wrench.torque.y
         self.current_torque['z'] = msg.wrench.torque.z
-        self.current_arm['y'] = self.current_torque['y'] / self.current_force['z']
+        self.current_arm['y'] = self.current_torque['y'] / (self.current_force['z'] + 1e-6)
 
     def force_xy_cb(self, msg):
         self.current_force['z'] = msg.data

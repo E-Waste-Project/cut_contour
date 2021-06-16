@@ -424,6 +424,10 @@ class CompetitionOperations():
         self.battery_ms.move_group.set_named_target("battery_pose_back")
         self.battery_ms.move_group.go()
         print("Oriented to battery Orientation to Vertical!!!!")
+        
+        rospy.sleep(1)
+        
+        target = "battery_pose_left" if self.flipped else "battery_pose_right"
 
         rospy.sleep(5)
 
@@ -474,9 +478,31 @@ class CompetitionOperations():
         pose_array.poses.append(deepcopy(spiral_array.poses[0]))
         pose_array.poses[0].position.z += 0.06
         self.battery_ms.move_group.clear_pose_targets()
-        self.battery_ms.move_group.set_pose_reference_frame("base_link")
-        self.battery_ms.move_group.set_pose_target(pose_array.poses[0])
-        result = self.battery_ms.move_group.go()
+        self.battery_ms.move_group.set_pose_reference_frame("gripper_battery")
+        # self.battery_ms.move_group.set_pose_target(pose_array.poses[0])
+        pose_array = self.tf_services.transform_poses("gripper_battery", "base_link", pose_array)
+        step = 5
+        plan = None
+        while not rospy.is_shutdown():
+            plan = self.battery_ms.move_group.plan(pose_array.poses[0])
+            print("plan points = ", plan.joint_trajectory.points)
+            if not plan.joint_trajectory.points:
+                q = [pose_array.poses[0].orientation.x, pose_array.poses[0].orientation.y,
+                     pose_array.poses[0].orientation.z, pose_array.poses[0].orientation.w]
+                angles = euler_from_quaternion(q)
+                angles = list(angles)
+                angles[0] += step * pi/180.0
+                if angles[0] > 2*pi:
+                    angles[0] -= 2*pi
+                q = quaternion_from_euler(angles[0], angles[1], angles[2])
+                pose_array.poses[0].orientation.x = q[0]
+                pose_array.poses[0].orientation.y = q[1]
+                pose_array.poses[0].orientation.z = q[2]
+                pose_array.poses[0].orientation.w = q[3]
+                continue
+            else:
+                break
+        result = self.battery_ms.move_group.execute(plan, wait=True)
         # self.battery_ms.move_straight(pose_array, vel_scale=0.1, acc_scale=0.1)
         print("Moved to Pose within safe distance")
         if not result:
@@ -497,6 +523,7 @@ class CompetitionOperations():
             "base_link", "gripper_battery")
         for pose in spiral_array.poses:
             pose.position.z = gripper_pose.position.z
+            pose.orientation = gripper_pose.orientation
         self.battery_ms.move_to_touch(spiral_array, axis='x', force_thresh=4)
 
         # Record Hole Position
