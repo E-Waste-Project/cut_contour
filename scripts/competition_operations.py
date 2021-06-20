@@ -37,8 +37,8 @@ class CompetitionOperations():
         self.tf_services = TransformServices()
         # self.x_comp_pb = -0.005
         # self.y_comp_pb = 0.004
-        self.x_comp_pb = -0.0006 + 0.001
-        self.y_comp_pb = 0.001
+        self.x_comp_pb = 0.0004
+        self.y_comp_pb = 0.0015
         
         self.x_comp_key = 0.0
         self.y_comp_key = 0.007
@@ -52,10 +52,13 @@ class CompetitionOperations():
         self.x_comp_battery = -0.0006
         self.y_comp_battery = 0.005
         
-        self.left_comp = -0.002
+        self.left_comp = -0.004
 
         self.x_comp_battery_hole = 0.0064
         self.y_comp_battery_hole = 0.007
+        
+        self.x_comp_ethernet = 0.0004
+        self.y_comp_ethernet = 0.0015
         
         self.x_comp_ethernet_hole = 0.004
         self.y_comp_ethernet_hole = 0.002
@@ -71,7 +74,31 @@ class CompetitionOperations():
         board_state = msg.data
         if board_state == "Flipped":
             self.flipped = True
+            self.x_comp_pb *= 0
+            self.y_comp_pb *= 0
+            
+            self.x_comp_key *= 0
+            self.y_comp_key *= 0
+            
+            self.x_comp_key_hole *= 0
+            self.y_comp_key_hole *= 0  
+            
+            self.x_comp_cover *= 0
+            self.y_comp_cover *= 0       
+            
+            self.x_comp_battery *= 0
+            self.y_comp_battery *= 0
+            
+            self.left_comp *= 0
 
+            self.x_comp_battery_hole *= 0
+            self.y_comp_battery_hole *= 0
+            
+            self.x_comp_ethernet *= 0
+            self.y_comp_ethernet *= 0
+            
+            self.x_comp_ethernet_hole *= 0
+            self.y_comp_ethernet_hole *= 0
         else:
             self.flipped = False
         rospy.sleep(3)
@@ -135,7 +162,7 @@ class CompetitionOperations():
         self.pb_cover_ms.move_to_touch(pose_array, axis='xy', force_thresh=5)
         rospy.loginfo("Pushed !!!!")
 
-        rospy.sleep(5)
+        # rospy.sleep(1) 
 
         # move up
         pb_pose = self.tf_services.lookup_transform(
@@ -145,7 +172,7 @@ class CompetitionOperations():
         self.pb_cover_ms.move_straight(pose_array, vel_scale=1, acc_scale=1)
         rospy.loginfo("Moved !!!!")
 
-        rospy.sleep(1)
+        # rospy.sleep(1)
 
         # publish done msgmsgne"
         pb_done_msg = String()
@@ -193,12 +220,13 @@ class CompetitionOperations():
         self.pb_cover_ms.move_group.clear_pose_targets()
         self.pb_cover_ms.move_group.set_pose_reference_frame("base_link")
         self.pb_cover_ms.move_group.set_pose_target(pose_array.poses[0])
-        self.pb_cover_ms.move_group.go()
+        result = self.pb_cover_ms.move_group.go()
         # self.pb_cover_ms.move_straight(pose_array, vel_scale=1, acc_scale=1)
-
+        if not result:
+            rospy.sleep(3)
+        
         # move to touch on the cover
-        cover_pose = self.tf_services.lookup_transform(
-            "base_link", "gripper_pb_cover")
+        cover_pose = self.tf_services.lookup_transform("base_link", "gripper_pb_cover")
         cover_pose.position.z -= 0.1
         pose_array.poses[0] = cover_pose
         self.pb_cover_ms.move_to_touch(pose_array, axis='xy', force_thresh=20)
@@ -220,15 +248,15 @@ class CompetitionOperations():
             pose_array, vel_scale=1, acc_scale=1, ref_frame="gripper_cover")
         rospy.loginfo("Opened !!!!")
 
-        # move up flipped=False
-        cover_pose = self.tf_services.lookup_transform(
-            "base_link", "gripper_pb_cover")
-        cover_pose.position.z += 0.1
-        pose_array.poses[0] = cover_pose
-        self.pb_cover_ms.move_straight(pose_array, vel_scale=1, acc_scale=1)
-        rospy.loginfo("Moved !!!!")
+        # # move up flipped=False
+        # cover_pose = self.tf_services.lookup_transform(not 
+        #     "base_link", "gripper_pb_cover")
+        # cover_pose.position.z += 0.1
+        # pose_array.poses[0] = cover_pose
+        # self.pb_cover_ms.move_straight(pose_array, vel_scale=1, acc_scale=1)
+        # rospy.loginfo("Moved !!!!")
 
-        rospy.sleep(1)
+        # rospy.sleep(1)
 
         # Return to Capture Pose
         capture_pose = self.tf_services.lookup_transform(
@@ -238,14 +266,14 @@ class CompetitionOperations():
         self.camera_ms.move_group.set_pose_target(capture_pose)
         self.camera_ms.move_group.go()
 
-        rospy.sleep(1)
+        # rospy.sleep(1)
 
         # publish done msg
         pb_done_msg = String()
         pb_done_msg.data = "done"
         self.done_pub.publish(pb_done_msg)
 
-        rospy.sleep(1)
+        # rospy.sleep(1)
 
         capture_msg = String()
         capture_msg.data = "Detect"
@@ -263,7 +291,7 @@ class CompetitionOperations():
         pose_array.poses.append(battery_pose)
         pose_array = self.tf_services.transform_poses(
             "base_link", "capture_frame", pose_array)
-        pose_array.poses[0].position.z += 0.02
+        pose_array.poses[0].position.z += 0.07
         q = [pose_array.poses[0].orientation.x, pose_array.poses[0].orientation.y,
              pose_array.poses[0].orientation.z, pose_array.poses[0].orientation.w]
         angles = euler_from_quaternion(q)
@@ -287,22 +315,22 @@ class CompetitionOperations():
         self.battery_picker_ms.move_group.set_pose_target(pose_array.poses[0])
         result = self.battery_picker_ms.move_group.go()
         if not result:
-            rospy.sleep(5)
+            rospy.sleep(3)
         # self.battery_picker_ms.move_straight(
             # pose_array, vel_scale=1, acc_scale=1)
 
         print("Moved to Battery Pose")
         
-        rospy.sleep(1)
+        # rospy.sleep(1)
 
         # move to touch the battery axis using battery picker movegroup, while keeping a certain amount of force.
-        pose_array.poses[0].position.z -= 0.07
+        pose_array.poses[0].position.z -= 0.2
         self.battery_picker_ms.move_to_touch(
             pose_array, axis='xy', force_thresh=10)
 
         print("Touched!!!!")
 
-        rospy.sleep(1)
+        # rospy.sleep(1)
 
         # move left until the fz equals zero.
         pose_array = self.battery_picker_ms.shift_pose_by(
@@ -314,42 +342,42 @@ class CompetitionOperations():
 
         print("Moved Left!!!!")
 
-        rospy.sleep(1)
+        # rospy.sleep(1)
 
         # move to touch in z direction.
         battery_pose = self.tf_services.lookup_transform(
             "base_link", "gripper_battery_picker")
-        battery_pose.position.z -= 0.02
+        battery_pose.position.z -= 0.021
         pose_array.poses[0] = battery_pose
         self.battery_picker_ms.move_to_touch(
             pose_array, axis='xy', force_thresh=9)
         print("Touched!!!")
 
-        rospy.sleep(1)
+        # rospy.sleep(1)
 
         # move to touch in right direction until certain force is achieved.
         right_dist = 0.01
         pose_array = self.battery_picker_ms.shift_pose_by(
             self.tf_services, "base_link", "gripper_battery_picker", trans=(right_dist, 0, 0), new_frame="battery_fixed_frame")
         self.battery_picker_ms.move_to_touch(
-            pose_array, axis='z', force_thresh=8, ref_frame="battery_fixed_frame")
+            pose_array, axis='z', force_thresh=10, ref_frame="battery_fixed_frame")
         print("Moved Right!!!!")
 
-        rospy.sleep(1)
+        # rospy.sleep(1)
 
         # move up by a certain amount.
         pose_array = self.battery_picker_ms.shift_pose_by(
-            self.tf_services, "base_link", "gripper_battery_picker", trans=(0.005, 0, 0), new_frame="battery_fixed_frame")
+            self.tf_services, "base_link", "gripper_battery_picker", trans=(0, 0, 0), new_frame="battery_fixed_frame")
         pose_array = self.tf_services.transform_poses(
-            "base_link", "gripper_battery_picker", pose_array)
-        pose_array.poses[0].position.z += 0.02
+            "base_link", pose_array.header.frame_id, pose_array)
+        pose_array.poses[0].position.z += 0.03
         result = self.battery_picker_ms.move_straight(
-            pose_array, vel_scale=0.5, acc_scale=0.5)
+            pose_array, vel_scale=0.1, acc_scale=0.1)
         if not result:
-            rospy.sleep(5)
+            rospy.sleep(3)
         print("Moved Up!!!!")
 
-        rospy.sleep(1)
+        # rospy.sleep(1)
 
         # move left
         pose_array = self.battery_picker_ms.shift_pose_by(
@@ -357,11 +385,11 @@ class CompetitionOperations():
         result = self.battery_picker_ms.move_straight(
             pose_array, ref_frame="battery_fixed_frame")
         if not result:
-            rospy.sleep(5)
+            rospy.sleep(3)
         print("Moved Left!!!!")
         print("DONE!!!!")
 
-        rospy.sleep(1)
+        # rospy.sleep(1)
 
         # move up by a certain amount.
         battery_pose = self.tf_services.lookup_transform(
@@ -371,10 +399,10 @@ class CompetitionOperations():
         result = self.battery_picker_ms.move_straight(
             pose_array, vel_scale=0.5, acc_scale=0.5)
         if not result:
-            rospy.sleep(5)
+            rospy.sleep(3)
         print("Moved Up!!!!")
 
-        rospy.sleep(1)
+        # rospy.sleep(1)
 
         # Get current position of gripper_battery_picker as it is the picking pose
         picking_pose = self.tf_services.lookup_transform(
@@ -392,10 +420,10 @@ class CompetitionOperations():
         result = self.battery_ms.move_group.go()
         # self.battery_ms.move_straight(pose_array, pose_array.header.frame_id, vel_scale=1, acc_scale=1)
         if not result:
-            rospy.sleep(5)
+            rospy.sleep(3)
         print("Oriented to backward gripper Orientation!!!!")
 
-        rospy.sleep(1)
+        # rospy.sleep(1)
 
         # go to battery picking pose.
         # Make the battery move_group go to the right poistioin.
@@ -409,10 +437,10 @@ class CompetitionOperations():
         result = self.battery_ms.move_group.go()
         # self.battery_ms.move_straight(pose_array, vel_scale=1, acc_scale=1)
         if not result:
-            rospy.sleep(5)
+            rospy.sleep(3)
         print("Moved the battery group!!!!")
 
-        rospy.sleep(1)
+        # rospy.sleep(1)
 
         # Orient the battery move_group to the battery orientation, and move it back a little.
         battery_angle = atan2(1.8, 4.8)
@@ -426,10 +454,10 @@ class CompetitionOperations():
         result = self.battery_ms.move_group.go()
         # self.battery_ms.move_straight(pose_array, "gripper_battery")
         if not result:
-            rospy.sleep(5)
+            rospy.sleep(3)
         print("Oriented to battery Orientation!!!!")
 
-        rospy.sleep(1)
+        # rospy.sleep(1)
 
         # Adjust position for gripping.
         adjust_x = -0.03
@@ -444,18 +472,18 @@ class CompetitionOperations():
         result = self.battery_ms.move_group.go()
         # self.battery_ms.move_straight(pose_array, "gripper_battery")
         if not result:
-            rospy.sleep(5)
+            rospy.sleep(3)
         print("Adjust position for gripping!!!!")
 
         # Move to touch vertically.
         battery_pose = self.tf_services.lookup_transform(
             "base_link", "gripper_battery")
-        battery_pose.position.z -= 0.03
+        battery_pose.position.z -= 0.05
         pose_array.poses = [battery_pose]
         self.battery_ms.move_to_touch(pose_array, axis='xy', force_thresh=5)
         print("Touched!!!")
 
-        rospy.sleep(1)
+        # rospy.sleep(1)
 
         # Grip
         self.battery_ms.change_tool_status(status=1, signal="Robothon_EE")
@@ -471,9 +499,9 @@ class CompetitionOperations():
             pose_array, vel_scale=0.01, acc_scale=0.01)
         print("Moved Upwards!!!")
         if not result:
-            rospy.sleep(5)
+            rospy.sleep(3)
 
-        rospy.sleep(2)
+        # rospy.sleep(1)
         # Orient the battery move_group to make the battery vertical.
         # pose_array = self.battery_ms.shift_pose_by(
         #     self.tf_services, "base_link", "gripper_batpose_arraytery", rot=(0, -pi/2 + battery_angle, 0))
@@ -482,38 +510,41 @@ class CompetitionOperations():
         self.camera_ms.move_group.set_named_target("camera_pose")
         result = self.camera_ms.move_group.go()
         if not result:
-            rospy.sleep(5)
+            rospy.sleep(3)
         print("Oriented to battery Orientation to Vertical!!!!")
         
-        rospy.sleep(2)
+        rospy.sleep(1)
         
         target = "battery_pose_left" if self.flipped else "battery_pose_right"
         
         self.battery_ms.move_group.set_named_target(target)
         result = self.battery_ms.move_group.go()
         if not result:
-            rospy.sleep(5)
+            rospy.sleep(3)
         print("Oriented to correct starting pose, Ready for Spiral!!!!")
 
-        rospy.sleep(2)
+        # rospy.sleep(1)
 
         # publish done msgmsgne"
         pb_done_msg = String()
         pb_done_msg.data = "done"
         self.done_pub.publish(pb_done_msg)
+        
     def left_battery_cb(self, msg):
 
         # recieve battery pose
         battery_pose = msg
-        battery_pose.position.y += self.left_comp
+        if not self.flipped:
+            battery_pose.position.y += self.left_comp
         print("Recieved Left Battery Pose = ", battery_pose)
-
         self.battery_operation(battery_pose)
 
     def right_battery_cb(self, msg):
 
         # recieve battery pose
         battery_pose = msg
+        if self.flipped:
+            battery_pose.position.y += self.left_comp
         print("Recieved Right Battery Pose = ", battery_pose)
         self.battery_operation(battery_pose, loc="right")
         
@@ -543,7 +574,7 @@ class CompetitionOperations():
         # Move above hole with a safe distance
         pose_array = PoseArray()
         pose_array.poses.append(deepcopy(spiral_array.poses[0]))
-        pose_array.poses[0].position.z = 0.21
+        pose_array.poses[0].position.z = 0.25
         self.battery_ms.move_group.clear_pose_targets()
         # self.tf_services.create_frame("base_link", "gripper_battery", "gripper_battery_fixed")
         self.battery_ms.move_group.set_pose_reference_frame("base_link")
@@ -575,19 +606,19 @@ class CompetitionOperations():
         # self.battery_ms.move_straight(pose_array, vel_scale=0.1, acc_scale=0.1)
         print("Moved to Pose within safe distance")
         if not result:
-            rospy.sleep(5)
+            rospy.sleep(3)
 
-        rospy.sleep(1)
+        # rospy.sleep(1)
         
         # Move vertically down to touch
         pose = self.tf_services.lookup_transform("base_link", "gripper_battery")
         pose_array.header.frame_id = "base_link"
         pose_array.poses[0] = pose
         pose_array.poses[0].position.z = 0.13
-        result = self.battery_ms.move_to_touch(pose_array, axis='x', force_thresh=5)
+        result = self.battery_ms.move_to_touch(pose_array, axis='x', force_thresh=3)
         print("Touched!!!!!")
 
-        rospy.sleep(1)
+        # rospy.sleep(1)
         
 
         if result != 3:
@@ -598,9 +629,9 @@ class CompetitionOperations():
             for pose in spiral_array.poses:
                 pose.position.z = gripper_pose.position.z
                 pose.orientation = gripper_pose.orientation
-            self.battery_ms.move_to_touch(spiral_array, axis='x', force_thresh=4)
+            self.battery_ms.move_to_touch(spiral_array, axis='x', force_thresh=2)
 
-            rospy.sleep(1)
+            # rospy.sleep(1)
         
         # Record Hole Position
         if self.hole_pose is None:
@@ -619,12 +650,12 @@ class CompetitionOperations():
         # result = self.battery_ms.move_straight(pose_array, vel_scale=0.01, acc_scale=0.01)
         print("Moved Downwards!!!")
         if not result:
-            rospy.sleep(5)
+            rospy.sleep(3)
 
         # Open Gripper
         self.battery_ms.change_tool_status(status=0, signal="Robothon_EE")
 
-        rospy.sleep(1)
+        # rospy.sleep(1)
         
         # move upwards
         pose = self.tf_services.lookup_transform(
@@ -634,7 +665,7 @@ class CompetitionOperations():
         pose_array.poses[0].position.z += 0.03
         self.battery_ms.move_straight(pose_array, vel_scale=0.1, acc_scale=0.1)
         
-        rospy.sleep(1)
+        # rospy.sleep(1)
 
         # close the gripper
         self.battery_ms.change_tool_status(status=1, signal="Robothon_EE")
@@ -649,7 +680,7 @@ class CompetitionOperations():
         pose_array.poses[0].position.z -= 0.1
         self.battery_ms.move_to_touch(pose_array, axis='x', force_thresh=5)
         
-        rospy.sleep(1)
+        # rospy.sleep(1)
         
         # move upwards
         pose = self.tf_services.lookup_transform(
@@ -659,7 +690,7 @@ class CompetitionOperations():
         pose_array.poses[0].position.z += 0.03
         self.battery_ms.move_straight(pose_array, vel_scale=0.1, acc_scale=0.1)
         
-        rospy.sleep(1)
+        # rospy.sleep(1)
 
         # Return to Capture Pose
         capture_pose = self.tf_services.lookup_transform(
@@ -668,9 +699,11 @@ class CompetitionOperations():
         self.camera_ms.move_group.clear_pose_targets()
         self.camera_ms.move_group.set_pose_reference_frame("base_link")
         self.camera_ms.move_group.set_pose_target(pose_array.poses[0])
-        self.camera_ms.move_group.go()
+        result = self.camera_ms.move_group.go()
+        if not result:
+            rospy.sleep(3)
 
-        rospy.sleep(5)
+        rospy.sleep(1)
 
         # publish done msgmsgne"
         pb_done_msg = String()
@@ -685,14 +718,14 @@ class CompetitionOperations():
         self.battery_ms.change_tool_status("Robothon_EE", status=1)
 
         for pose in pose_array.poses:
-            pose.position.x += self.x_comp_pb
-            pose.position.y += self.y_comp_pb
+            pose.position.x += self.x_comp_ethernet
+            pose.position.y += self.y_comp_ethernet
 
         # pose_array.poses[1].position.x += 0.005
 
         # go to ethernet empty pose
         pose_array = self.tf_services.transform_poses("base_link", "capture_frame", pose_array)
-        pose_array.poses[0].position.z += 0.03
+        pose_array.poses[0].position.z += 0.1
         q = [pose_array.poses[0].orientation.x, pose_array.poses[0].orientation.y,
              pose_array.poses[0].orientation.z, pose_array.poses[0].orientation.w]
         angles = euler_from_quaternion(q)
@@ -714,16 +747,16 @@ class CompetitionOperations():
         self.ethernet_ms.move_group.set_pose_target(pose_array.poses[0])
         self.ethernet_ms.move_group.go()
 
-        rospy.sleep(1)
+        # rospy.sleep(1)
 
         # Move to touch to know the actual depth
         ethernet_array = PoseArray()
         ethernet_array.poses.append(deepcopy(pose_array.poses[0]))
-        ethernet_array.poses[0].position.z -= 0.05
+        ethernet_array.poses[0].position.z -= 0.15
         self.ethernet_ms.move_to_touch(
             ethernet_array, axis='xy', force_thresh=2)
 
-        rospy.sleep(1)
+        # rospy.sleep(1)
 
         # Move up a bit.
         ethernet_pose = self.tf_services.lookup_transform(
@@ -738,9 +771,9 @@ class CompetitionOperations():
             ethernet_array, vel_scale=1, acc_scale=1)
         print("Moved Upwards!!!")
         if not result:
-            rospy.sleep(5)
+            rospy.sleep(3)
 
-        rospy.sleep(1)
+        # rospy.sleep(1)
 
         # approach the ethernet
         ethernet_array = self.ethernet_ms.shift_pose_by(self.tf_services, "base_link", "gripper_ethernet", "gripper_ethernet_fixed_1", trans=(0.2, 0, 0))
@@ -748,7 +781,7 @@ class CompetitionOperations():
             ethernet_array, axis='x', vel_scale=0.01, acc_scale=0.01, ref_frame=ethernet_array.header.frame_id, force_thresh=3)
         print("Approached Ethernet Cable!!!")
         if not result:
-            rospy.sleep(5)
+            rospy.sleep(3)
 
         rospy.sleep(1)
         
@@ -763,7 +796,7 @@ class CompetitionOperations():
             ethernet_array, vel_scale=0.01, acc_scale=0.01, ref_frame=ethernet_array.header.frame_id)
         print("Approached Ethernet Cable!!!")
         if not result:
-            rospy.sleep(5)
+            rospy.sleep(3)
 
         rospy.sleep(1)        
         
@@ -783,9 +816,9 @@ class CompetitionOperations():
             ethernet_array, vel_scale=0.01, acc_scale=0.01)
         print("Moved Upwards!!!")
         if not result:
-            rospy.sleep(5)
+            rospy.sleep(3)
 
-        rospy.sleep(1)
+        # rospy.sleep(1)
 
         # publish done msgmsgne"
         pb_done_msg = String()
@@ -808,19 +841,19 @@ class CompetitionOperations():
         for pose in pose_array.poses:
             pose.orientation = gripper_ethernet_pose.orientation
 
-        rospy.sleep(1)
+        # rospy.sleep(1)
 
         # move to ethernet empty pose
         ethernet_array = PoseArray()
         ethernet_array.poses.append(deepcopy(pose_array.poses[0]))
         ethernet_array.poses[0].position.z += 0.03
         result = self.ethernet_ms.move_straight(
-            ethernet_array, vel_scale=0.01, acc_scale=0.01)
+            ethernet_array, vel_scale=0.1, acc_scale=0.1)
         print("Moved To Etherned Empty!!!")
         if not result:
-            rospy.sleep(5)
+            rospy.sleep(3)
 
-        rospy.sleep(1)
+        # rospy.sleep(1)
         
         # move to touch
         ethernet_array = PoseArray()
@@ -830,7 +863,7 @@ class CompetitionOperations():
         ethernet_array.poses[0].position.z -= 0.05
         self.ethernet_ms.move_to_touch(
             ethernet_array, axis='xy', force_thresh=3)
-
+# 
         rospy.sleep(1)
 
         gripper_ethernet_pose = self.tf_services.lookup_transform(
@@ -881,7 +914,7 @@ class CompetitionOperations():
         if spiral_pose_idx >= spiral_sz:
             print("couldn't insert the Ethernet")
             return
-        rospy.sleep(1)
+        # rospy.sleep(1)
 
         # Move downwards.
         gripper_ethernet_pose = self.tf_services.lookup_transform(
@@ -893,9 +926,9 @@ class CompetitionOperations():
             ethernet_array, vel_scale=0.01, acc_scale=0.01, force_thresh=20, axis='xy')
         print("Ethernet inserted!!!")
         if not result:
-            rospy.sleep(5)
+            rospy.sleep(3)
 
-        rospy.sleep(1)
+        # rospy.sleep(1)
 
         # Open Gripper
         self.ethernet_ms.change_tool_status(status=0, signal="Robothon_EE")
@@ -911,8 +944,8 @@ class CompetitionOperations():
             ethernet_array, vel_scale=0.01, acc_scale=0.01)
         print("Ethernet inserted!!!")
         if not result:
-            rospy.sleep(5)
-        rospy.sleep(1)
+            rospy.sleep(3)
+        # rospy.sleep(1)
         
         # Close the gripper
         self.ethernet_ms.change_tool_status(status=1, signal="Robothon_EE")
@@ -928,8 +961,8 @@ class CompetitionOperations():
             ethernet_array, vel_scale=0.01, acc_scale=0.01, force_thresh=4, axis='xy')
         print("Ethernet inserted!!!")
         if not result:
-            rospy.sleep(5)
-        rospy.sleep(1)
+            rospy.sleep(3)
+        # rospy.sleep(1)
         
         # Open the gripper
         self.ethernet_ms.change_tool_status(status=0, signal="Robothon_EE")
@@ -945,8 +978,8 @@ class CompetitionOperations():
             ethernet_array, vel_scale=0.01, acc_scale=0.01)
         print("Ethernet inserted!!!")
         if not result:
-            rospy.sleep(5)
-        rospy.sleep(1)
+            rospy.sleep(3)
+        # rospy.sleep(1)
         
         # Return to Capture Pose
         capture_pose = self.tf_services.lookup_transform(
@@ -956,9 +989,9 @@ class CompetitionOperations():
         self.camera_ms.move_group.set_pose_target(capture_pose)
         result = self.camera_ms.move_group.go()
         if not result:
-            rospy.sleep(5)
+            rospy.sleep(3)
         
-        rospy.sleep(2)
+        # rospy.sleep(3)
 
         # publish done msgmsgne"
         pb_done_msg = String()
@@ -1008,7 +1041,7 @@ class CompetitionOperations():
         self.key_ms.move_group.go()
         print("Moved To Key!!!")
 
-        rospy.sleep(1)
+        # rospy.sleep(1)
 
         # approach the key
         pose_array = PoseArray()
@@ -1018,7 +1051,7 @@ class CompetitionOperations():
             pose_array, vel_scale=0.01, acc_scale=0.01, axis='xy', force_thresh=3)
         print("Key Reached!!!")
 
-        rospy.sleep(1)
+        # rospy.sleep(1)
 
         # move upwards
         gripper_key_pose = self.tf_services.lookup_transform(
@@ -1031,14 +1064,14 @@ class CompetitionOperations():
             pose_array, vel_scale=0.01, acc_scale=0.01)
         print("Ready to Pick the Key!!!")
         if not result:
-            rospy.sleep(5)
+            rospy.sleep(3)
 
-        rospy.sleep(1)
+        # rospy.sleep(1)
 
         # close the gripper
         self.key_ms.change_tool_status("Robothon_EE", status=1)
 
-        rospy.sleep(1)
+        # rospy.sleep(1)
 
         # move upwards
         pose_array.poses[0].position.z += 0.03
@@ -1046,9 +1079,9 @@ class CompetitionOperations():
             pose_array, vel_scale=0.01, acc_scale=0.01)
         print("Key Picked!!!")
         if not result:
-            rospy.sleep(5)
+            rospy.sleep(3)
 
-        rospy.sleep(1)
+        # rospy.sleep(1)
 
         # publish done msgmsgne"
         pb_done_msg = String()
@@ -1109,7 +1142,7 @@ class CompetitionOperations():
         print("Result = ", result)
         print("Touched Key Hole Surface!!!")
 
-        rospy.sleep(1)
+        # rospy.sleep(1)
         
         current_pose = self.tf_services.lookup_transform("base_link", "gripper_key")
         for pose in key_spiral_poses.poses:
@@ -1122,7 +1155,7 @@ class CompetitionOperations():
                                     z_thresh=0.01, z_upper=0.003, z_lower=-0.05,
                                     force_thresh=8, axis='xy', ref_frame="base_link",
                                     vel_scale=0.01, acc_scale=0.01)
-            rospy.sleep(1)        
+            # rospy.sleep(1)        
          
         
         
@@ -1147,8 +1180,8 @@ class CompetitionOperations():
             pose_array = self.key_ms.shift_pose_by(self.tf_services, "base_link", "gripper_key", trans=(-0.002, 0, 0))
             result = self.key_ms.move_straight(pose_array, "new_frame", vel_scale = 1, acc_scale = 1)
             if not result:
-                rospy.sleep(5)
-            rospy.sleep(1)
+                rospy.sleep(3)
+            # rospy.sleep(1)
             # close the gripper
             self.key_ms.change_tool_status("Robothon_EE", status=1)
             rospy.sleep(1)
@@ -1160,8 +1193,8 @@ class CompetitionOperations():
         pose_array = self.key_ms.shift_pose_by(self.tf_services, "base_link", "gripper_key", trans=(0, 0, -0.002))
         result = self.key_ms.move_straight(pose_array, "new_frame", vel_scale = 1, acc_scale = 1)
         if not result:
-            rospy.sleep(5)
-        rospy.sleep(1)
+            rospy.sleep(3)
+        # rospy.sleep(1)
         # close the gripper
         self.key_ms.change_tool_status("Robothon_EE", status=1)
         rospy.sleep(1)
@@ -1170,21 +1203,31 @@ class CompetitionOperations():
         pose_array = self.key_ms.shift_pose_by(self.tf_services, "base_link", "gripper_key", rot=(0, 0, 48 * pi / 180.0))
         result = self.key_ms.move_straight(pose_array, "new_frame", vel_scale=0.1, acc_scale=0.1)    
         if not result:
-            rospy.sleep(5)
+            rospy.sleep(3)
         rospy.sleep(1)
         
         # rotate key
         pose_array = self.key_ms.shift_pose_by(self.tf_services, "base_link", "gripper_key", rot=(0, 0, -48 * pi / 180.0))
         result = self.key_ms.move_straight(pose_array, "new_frame", vel_scale=0.1, acc_scale=0.1)
         if not result:
-            rospy.sleep(5)
+            rospy.sleep(3)
         
-        rospy.sleep(1)
+        # rospy.sleep(1)
         
         # Open the gripper
         self.key_ms.change_tool_status("Robothon_EE", status=0)
         
         rospy.sleep(1)
+        
+        # Move Up
+        key_pose = self.tf_services.lookup_transform("base_link", "gripper_key")
+        key_pose.position.z += 0.03
+        pose_array = PoseArray()
+        pose_array.poses.append(key_pose)
+        result = self.key_ms.move_straight(pose_array, vel_scale=1, acc_scale=1)
+        if not result:
+            rospy.sleep(3)
+        print("Moved Up!!!")
         
         # Return to Capture Pose
         capture_pose = self.tf_services.lookup_transform(
@@ -1194,8 +1237,8 @@ class CompetitionOperations():
         self.camera_ms.move_group.set_pose_target(capture_pose)
         result = self.camera_ms.move_group.go()
         if not result:
-            rospy.sleep(5)
-        rospy.sleep(2)
+            rospy.sleep(3)
+        # rospy.sleep(3)
                 
         # publish done msgmsgne"
         pb_done_msg = String()
