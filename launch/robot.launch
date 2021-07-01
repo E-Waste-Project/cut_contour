@@ -1,8 +1,8 @@
 <launch>
 
-     <include file="$(find abb_irb120_moveit_config)/launch/demo_robothon.launch" />
+     <include file="$(find abb_irb120_moveit_config)/launch/demo_ewaste.launch" />
      <include file="$(find perception)/launch/camera_driver.launch" />
-     <!-- <include file="$(find abb_irb120_moveit_config)/launch/camera_calibration.launch" /> -->
+     <include file="$(find abb_irb120_moveit_config)/launch/camera_calibration_2.launch" />
 
      <!-- <include file="$(find ft_sensor_driver)/launch/force_filtered.launch" />  -->
      <!-- <include file="$(find cut_contour)/launch/control.launch" />
@@ -14,7 +14,7 @@
      <!-- <node name="path_tracking" pkg="cut_contour" type="cut_contour.py" output="screen" /> -->
      <!-- <node pkg="screw_loosening" type="loosen_it.py" name="loosen_it" output="screen"/> -->
      <node name="motors_on" pkg="egm_config" type="start_robot.bash" output="screen" />
-     <!-- <node name="smach_viewer" pkg="smach_viewer" type="smach_viewer.py" output="screen" />
-     <node name="rqt_multiplot" pkg="rqt_multiplot" type="rqt_multiplot" output="screen" /> -->
+      <!-- <node name="smach_viewer" pkg="smach_viewer" type="smach_viewer.py" output="screen" /> -->
+     <!-- <node name="rqt_multiplot" pkg="rqt_multiplot" type="rqt_multiplot" output="screen" />  -->
 
 </launch>

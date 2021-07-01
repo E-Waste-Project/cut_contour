@@ -360,14 +360,14 @@ class CompetitionOperations():
         pose_array = self.battery_picker_ms.shift_pose_by(
             self.tf_services, "base_link", "gripper_battery_picker", trans=(right_dist, 0, 0), new_frame="battery_fixed_frame")
         self.battery_picker_ms.move_to_touch(
-            pose_array, axis='z', force_thresh=10, ref_frame="battery_fixed_frame")
+            pose_array, axis='z', force_thresh=8, ref_frame="battery_fixed_frame")
         print("Moved Right!!!!")
 
         # rospy.sleep(1)
 
         # move up by a certain amount.
         pose_array = self.battery_picker_ms.shift_pose_by(
-            self.tf_services, "base_link", "gripper_battery_picker", trans=(0, 0, 0), new_frame="battery_fixed_frame")
+            self.tf_services, "base_link", "gripper_battery_picker", trans=(0.003, 0, 0), new_frame="battery_fixed_frame")
         pose_array = self.tf_services.transform_poses(
             "base_link", pose_array.header.frame_id, pose_array)
         pose_array.poses[0].position.z += 0.03
@@ -791,7 +791,7 @@ class CompetitionOperations():
         rospy.sleep(1)
 
         # approach the ethernet
-        ethernet_array = self.ethernet_ms.shift_pose_by(self.tf_services, "base_link", "gripper_ethernet", "gripper_ethernet_fixed_2", trans=(0.01, 0, 0))
+        ethernet_array = self.ethernet_ms.shift_pose_by(self.tf_services, "base_link", "gripper_ethernet", "gripper_ethernet_fixed_2", trans=(0.015, 0, 0))
         result = self.ethernet_ms.move_straight(
             ethernet_array, vel_scale=0.01, acc_scale=0.01, ref_frame=ethernet_array.header.frame_id)
         print("Approached Ethernet Cable!!!")
