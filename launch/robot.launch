@@ -2,9 +2,9 @@
 
      <include file="$(find abb_irb120_moveit_config)/launch/demo_ewaste.launch" />
      <include file="$(find perception)/launch/camera_driver.launch" />
-     <include file="$(find abb_irb120_moveit_config)/launch/camera_calibration_2.launch" />
+     <!-- <include file="$(find abb_irb120_moveit_config)/launch/camera_calibration_3.launch" /> -->
 
-     <!-- <include file="$(find ft_sensor_driver)/launch/force_filtered.launch" />  -->
+     <include file="$(find ft_sensor_driver)/launch/force_filtered.launch" /> 
      <!-- <include file="$(find cut_contour)/launch/control.launch" />
      <include file="$(find screw_loosening)/launch/camera_pose_big_a3.launch" />
      <include file="$(find cut_contour)/launch/pitch_control.launch" /> -->

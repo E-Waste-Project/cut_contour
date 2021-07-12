@@ -77,6 +77,9 @@ class TransformServices():
 
     def create_frame(self, ref_frame, moving_frame, new_frame):
         pose = self.lookup_transform(ref_frame, moving_frame)
+        return self.create_frame_at_pose(pose, ref_frame, new_frame)
+    
+    def create_frame_at_pose(self, pose, ref_frame, new_frame):
         translation = [pose.position.x, pose.position.y, pose.position.z]
         orientation = [pose.orientation.x, pose.orientation.y,
                        pose.orientation.z, pose.orientation.w]
@@ -103,15 +106,19 @@ class MotionServices():
         # TODO: Adjust quaternions of links
         self.tool_quat_base_link = [0, 1, 0, 0]
         self.tool_quat_table_link = [0.707, -0.707, 0.000, -0.000]
-        self.current_force = {'z': 0, 'xy': 0, 'x': 0, 'y': 0}
+        self.current_force = {'z': 0, 'x': 0, 'y': 0, 'xy': 0, 'yz': 0, 'xz': 0}
         self.current_torque = {'z': 0, 'xy': 0, 'x': 0, 'y': 0}
         self.current_arm = {'x' : 0, 'y': 0, 'z': 0}
         # rospy.Subscriber("ft_sensor_wrench/resultant/filtered", Float64, self.force_xy_cb)
-        # rospy.Subscriber("ft_sensor_wrench/filtered_z", Float64, self.force_z_cb)
-        rospy.Subscriber("ft_sensor_wrench/resultant/raw",
+        # rospy.Subscriber("ft_sensor_wrench/filtered_z", Float64, self.forces_cb)
+        rospy.Subscriber("ft_sensor_wrench/resultant/filtered/xy",
                          Float64, self.force_xy_cb)
-        rospy.Subscriber("ft_sensor_wrench/wrench/raw",
-                         WrenchStamped, self.force_z_cb)
+        rospy.Subscriber("ft_sensor_wrench/resultant/filtered/yz",
+                         Float64, self.force_yz_cb)
+        rospy.Subscriber("ft_sensor_wrench/resultant/filtered/xz",
+                         Float64, self.force_xz_cb)
+        rospy.Subscriber("ft_sensor_wrench/wrench/filtered",
+                         WrenchStamped, self.forces_cb)
         rospy.Subscriber("/execute_trajectory/result", ExecuteTrajectoryActionResult, self.goal_status_cb)
         self.tool = rospy.ServiceProxy(
             "/rws/set_io_signal", SetIOSignal)
@@ -138,17 +145,23 @@ class MotionServices():
 
         return result
 
-    def force_z_cb(self, msg):
-        self.current_force['xy'] = msg.wrench.force.z
+    def forces_cb(self, msg):
         self.current_force['x'] = msg.wrench.force.x
         self.current_force['y'] = msg.wrench.force.y
+        self.current_force['z'] = msg.wrench.force.z
         self.current_torque['x'] = msg.wrench.torque.x
         self.current_torque['y'] = msg.wrench.torque.y
         self.current_torque['z'] = msg.wrench.torque.z
         self.current_arm['y'] = self.current_torque['y'] / (self.current_force['z'] + 1e-6)
 
     def force_xy_cb(self, msg):
-        self.current_force['z'] = msg.data
+        self.current_force['xy'] = msg.data
+        
+    def force_yz_cb(self, msg):
+        self.current_force['yz'] = msg.data
+        
+    def force_xz_cb(self, msg):
+        self.current_force['xz'] = msg.data
     
     def goal_status_cb(self, msg):
         # status = 2 means "Preempted" i.e. We stopped in the middle of motion.

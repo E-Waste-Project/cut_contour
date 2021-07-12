@@ -12,7 +12,7 @@ import rospy
 from copy import deepcopy
 import tf
 from math import fabs
-from cut_contour.robot_helpers import transform_poses
+from cut_contour.robot_helpers import TransformServices
 
 
 class irb120():
@@ -22,7 +22,8 @@ class irb120():
     def __init__(self):
         self.group = MoveGroupCommander(self.TOOL_GROUP)
         self.transformer_listener = tf.TransformListener()
-        rospy.Subscriber("/cut_xyz", PoseArray, self.cut_cb)
+        # rospy.Subscriber("/cut_xyz", PoseArray, self.cut_cb)
+        rospy.Subscriber("/px_to_xyz", PoseArray, self.cut_cb)
         rospy.Subscriber("/rws/system_states", SystemState, self.states_cb)
         self.done_pub = rospy.Publisher("/done", String, queue_size=1)
         self.approach_dist = 0.01
@@ -38,6 +39,7 @@ class irb120():
         self.tool_quat_table_link = [0.707, -0.707, 0.000, -0.000]
         self.cutting_tool = rospy.ServiceProxy(
             "/rws/set_io_signal", SetIOSignal)
+        self.tf_services = TransformServices()
 
     def states_cb(self, state_msg):
         if state_msg.motors_on == False and self.working_flag == True:
@@ -177,9 +179,9 @@ class irb120():
         tool_pose = PoseArray()
         pose = Pose()
         print(pose)
-        pose_arr.header.frame_id = "tool0_comp"
+        pose_arr.header.frame_id = "milling_tool"
         pose_arr.poses.append(pose)
-        tool_pose = transform_poses("base_link", "tool0_comp", pose_arr)
+        tool_pose = self.tf_services.transform_poses("base_link", "milling_tool", pose_arr)
 
         return tool_pose.poses[0]
 
@@ -189,47 +191,47 @@ class irb120():
         result = self.approch_point(first_point)
         print("approach result = ", result)
 
-        # measure z
-        rospy.sleep(3)
-        measure_point = deepcopy(first_point)
-        surface_z = self.measure_z(
-            measure_point, vel_scale=self.measure_z_feed_rate, acc_scale=self.measure_z_feed_rate)
+        # # measure z
+        # rospy.sleep(3)
+        # measure_point = deepcopy(first_point)
+        # surface_z = self.measure_z(
+        #     measure_point, vel_scale=self.measure_z_feed_rate, acc_scale=self.measure_z_feed_rate)
 
-        # modify z of the contour
-        for i in range(len(contour.poses)):
-            contour.poses[i].position.z = surface_z
-
-        # retreat
-        retreat_from_measure = deepcopy(contour.poses[0])
-        result = self.move_straight(
-            retreat_from_measure, z_dist=0.01, vel_scale=1, acc_scale=1)
-        print("retreat result = ", result)
-
-        # turn on the tool
-        # self.change_tool_status(status=1)
-
-        # move in the air above contour to check for obstacles and modify path to avoid them
-        for i in range(len(contour.poses)):
-            point_to_cut = deepcopy(contour.poses[i])
-            result = self.safe_move_straight(
-                point_to_cut, z_dist=self.depth_of_cut, vel_scale=self.cut_feed_rate, acc_scale=self.cut_feed_rate)
-        print("contour result = ", result)
-
-        # turn on the tool
-        # self.change_tool_status(status=1)
-
-        # take the depth of cut and cut the contour
+        # # modify z of the contour
         # for i in range(len(contour.poses)):
-        #     point_to_cut = deepcopy(contour.poses[i])
-        #     result = self.move_straight(
-        #         point_to_cut, z_dist=self.depth_of_cut, vel_scale=self.cut_feed_rate, acc_scale=self.cut_feed_rate)
-        # print ("contour result = ", result)
+        #     contour.poses[i].position.z = surface_z
 
         # # retreat
-        # retreat_point = deepcopy(contour.poses[-1])
+        # retreat_from_measure = deepcopy(contour.poses[0])
         # result = self.move_straight(
-        #     point_to_cut, z_dist=self.retreat_dist, vel_scale=self.retreat_feed_rate, acc_scale=self.retreat_feed_rate)
-        # print ("retreat result = ", result)
+        #     retreat_from_measure, z_dist=0.01, vel_scale=1, acc_scale=1)
+        # print("retreat result = ", result)
+
+        # # turn on the tool
+        # self.change_tool_status(status=1)
+
+        # # move in the air above contour to check for obstacles and modify path to avoid them
+        # for i in range(len(contour.poses)):
+        #     point_to_cut = deepcopy(contour.poses[i])
+        #     result = self.safe_move_straight(
+        #         point_to_cut, z_dist=self.depth_of_cut, vel_scale=self.cut_feed_rate, acc_scale=self.cut_feed_rate)
+        # print("contour result = ", result)
+
+        # turn on the tool
+        self.change_tool_status(status=1)
+
+        # take the depth of cut and cut the contour
+        for i in range(len(contour.poses)):
+            point_to_cut = deepcopy(contour.poses[i])
+            result = self.move_straight(
+                point_to_cut, z_dist=self.depth_of_cut, vel_scale=self.cut_feed_rate, acc_scale=self.cut_feed_rate)
+        print ("contour result = ", result)
+
+        # retreat
+        retreat_point = deepcopy(contour.poses[-1])
+        result = self.move_straight(
+            point_to_cut, z_dist=self.retreat_dist, vel_scale=self.retreat_feed_rate, acc_scale=self.retreat_feed_rate)
+        print ("retreat result = ", result)
 
         # turn off the tool
         self.change_tool_status(status=0)
@@ -277,7 +279,7 @@ class irb120():
         filtered_plan = self.__filter_plan(plan)
 
         # get the initial force
-        msg = rospy.wait_for_message("/ft_sensor_wrench/filtered_z", Float64)
+        msg = rospy.wait_for_message("/ft_sensor_wrench/resultant/filtered_z", Float64)
         init_force_z = msg.data
         print("initial_force = ", init_force_z)
 
@@ -290,7 +292,7 @@ class irb120():
         change_force = fabs(current_force_z - init_force_z)
         while change_force < self.force_z_threshold:
             msg = rospy.wait_for_message(
-                "/ft_sensor_wrench/filtered_z", Float64)
+                "/ft_sensor_wrench/resultant/filtered_z", Float64)
             current_force_z = msg.data
             change_force = fabs(current_force_z - init_force_z)
             print("change in force = ", change_force)
@@ -301,9 +303,9 @@ class irb120():
         tool_pose = PoseArray()
         pose = Pose()
         print(pose)
-        pose_arr.header.frame_id = "tool0_comp"
+        pose_arr.header.frame_id = "milling_tool"
         pose_arr.poses.append(pose)
-        tool_pose = transform_poses("base_link", "tool0_comp", pose_arr)
+        tool_pose = self.tf_services.transform_poses("base_link", "milling_tool", pose_arr)
 
         return tool_pose.poses[0].position.z
 
@@ -327,8 +329,10 @@ class irb120():
         return response
 
     def cut_cb(self, contour_msg):
+        print("PRESS ENTER TO START")
+        input()
         self.working_flag = True
-        trans_poses = transform_poses(
+        trans_poses = self.tf_services.transform_poses(
             "base_link", "calibrated_frame", contour_msg)
         no_contours = len(contour_msg.poses) / 5
         # no_contours = 1

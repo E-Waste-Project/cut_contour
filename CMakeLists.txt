@@ -110,7 +110,7 @@ generate_messages(
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES cut_contour
-#  CATKIN_DEPENDS other_catkin_pkg
+CATKIN_DEPENDS roscpp rospy
 #  DEPENDS system_lib
 )
 
