@@ -1,0 +1,23 @@
+<launch>
+    <node pkg="rostopic" type="rostopic" name="rostopic" args="pub -r 2 /force_pid/setpoint std_msgs/Float64 5.0"/>
+    <node pkg="ft_sensor_driver" type="ft_sensor_driver.py" name="ft_sensor_driver"/>
+    <node pkg="ft_sensor_driver" type="lp_filter.py" name="lp_filter" >
+    <remap from="/ft_sensor_wrench/resultant/filtered" to="/force_pid/state" />
+    </node>
+    <node pkg="ft_sensor_driver" type="res_pub.py" name="res_pub" output="screen"/>
+
+    <node name="force_controller" pkg="pid" type="controller" ns="force_pid" output="screen" >
+      <param name="node_name" value="force_controller" />
+      <param name="Kp" value="0.05" />
+      <param name="Ki" value="0.0" />
+      <param name="Kd" value="0.0" />
+      <param name="upper_limit" value="0.002" />
+      <param name="lower_limit" value="-0.002" />
+      <param name="windup_limit" value="0.0" />
+      <param name="cutoff_frequency" value="10" />
+      <param name="pid_debug" value="true"/>
+      <remap from="setpoint" to="/force_pid/setpoint" />
+      <remap from="state" to="/force_pid/state" />
+      <remap from="control_effort" to="/force_pid/control_effort" />
+     </node>
+</launch>

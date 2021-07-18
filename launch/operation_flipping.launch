@@ -1,7 +1,0 @@
-<?xml version="1.0"?>
-<launch>
-    <node name="ft_sensor_driver" pkg="ft_sensor_driver" type="ft_sensor_driver.py" />
-    <node name="lp_filter" pkg="ft_sensor_driver" type="lp_filter.py" />
-    <node name="flipping" pkg="cut_contour" type="flipping_planner.py" output="screen" />
-
-</launch>

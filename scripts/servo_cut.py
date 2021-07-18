@@ -10,12 +10,13 @@ from controller_manager_msgs.srv import SwitchController, SwitchControllerReques
 from std_msgs.msg import Float64
 from std_msgs.msg import String
 import matplotlib.pyplot as plt
-from cut_contour import irb120
+# from cut_contour import irb120
 #from mpl_toolkits.mplot3d import axes3d
 from tf.transformations import euler_from_quaternion
 import roslaunch
 from abb_robot_msgs.srv import SetIOSignal, SetIOSignalRequest
 from abb_robot_msgs.msg import SystemState
+from cut_contour.robot_helpers import TransformServices, MotionServices
 
 class Subscribers():
     def __init__(self):
@@ -39,7 +40,7 @@ class Subscribers():
         self.dist = 0
         #self.controller_client = rospy.ServiceProxy("/egm/controller_manager/switch_controller", SwitchController)
         # self.cutting_tool_group = MoveGroupCommander("cutting_tool")
-        self.robot = irb120()
+        #self.robot = irb120()
         self.dist_threshold = 0.003
         self.theta = 0
         self.setpoint_pub = rospy.Publisher("/position/setpoint",Float64,latch=True,queue_size=1)
@@ -61,9 +62,9 @@ class Subscribers():
         self.curr_y = []
         self.pitch = 0
         self.angular_control_action = 0
-        self.z_offset = 0
+        self.z_offset = 0.01
           
-        self.depth_of_cut = 0.035     
+        self.depth_of_cut = 0.045     
         
         uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
         roslaunch.configure_logging(uuid)
@@ -71,7 +72,10 @@ class Subscribers():
     uuid, ["/home/zaferpc/abb_ws/src/cut_contour/launch/servo_test.launch"])
         self.servo_launch.start()
     
-        self.cutting_tool = rospy.ServiceProxy("/rws/set_io_signal", SetIOSignal)  
+        self.cutting_tool = rospy.ServiceProxy("/rws/set_io_signal", SetIOSignal)
+        
+        self.tf_services = TransformServices()
+        self.cutting_ms = MotionServices('cutting_tool')  
     
     def states_cb(self, state_msg):
         if state_msg.motors_on == False and self.working_flag == True:
@@ -141,10 +145,14 @@ class Subscribers():
         
     def poses_callback(self, msg):
         
+        self.cutting_ms.change_tool_status('Clamp_Off', status = 0)
+        rospy.sleep(1)
+        self.cutting_ms.change_tool_status('Clamp_On', status = 1)
+        
         self.working_flag = True
        # self.servo_launch.start()
         trans_contour = PoseArray()
-        trans_contour = self.transform_contour("base_link", "camera_color_optical_frame", msg)
+        trans_contour = self.transform_contour("base_link", "calibrated_frame", msg)
         # trans_contour = msg
 
         self.pose_array = np.zeros((len(trans_contour.poses),3))
@@ -158,7 +166,7 @@ class Subscribers():
         # self.pose_array = temp_array
         # print(self.pose_array.shape)
                 
-        self.robot.group.set_pose_reference_frame("base_link")
+        self.cutting_ms.move_group.set_pose_reference_frame("base_link")
         x = self.pose_array[0,0]
         y = self.pose_array[0,1]
         z = self.pose_array[0,2]
@@ -168,8 +176,8 @@ class Subscribers():
         print("z = ", z)
         print(self.pose_array.shape)
 
-        self.robot.group.set_pose_target([x, y, z + self.z_offset, 0, 1, 0, 0])
-        self.robot.group.go()
+        self.cutting_ms.move_group.set_pose_target([x, y, z + self.z_offset, 0, 0.707, 0, 0.707])
+        self.cutting_ms.move_group.go()
         
         # cutting tool on
         cutting_tool_on = SetIOSignalRequest()
@@ -177,18 +185,43 @@ class Subscribers():
         cutting_tool_on.value = "1"
         self.cutting_tool(cutting_tool_on)
         
-        goal_list = PoseArray()
-        goal = Pose()
-        goal.position.x = x
-        goal.position.y = y
-        goal.position.z = z - self.depth_of_cut
+        touch_list =PoseArray()
+        touch = Pose()
+        touch.position.x = x
+        touch.position.y = y
+        touch.position.z = z - 0.1
         #goal.position.z = z+z_offset
-        goal.orientation.x = 0
-        goal.orientation.y = 1
-        goal.orientation.z = 0
-        goal.orientation.w = 0
-        goal_list.poses.append(goal)
-        self.robot.cut_in_contour(goal_list.poses, "base_link", vel_scale=0.001, acc_scale=0.001)
+        touch.orientation.x = 0
+        touch.orientation.y = 0.707
+        touch.orientation.z = 0
+        touch.orientation.w = 0.707
+        touch_list.poses.append(touch)
+        
+        self.cutting_ms.move_to_touch(touch_list ,'x', force_thresh =1 , ref_frame = 'base_link')
+        no_cut_pose = self.tf_services.lookup_transform('base_link', 'milling_tool')
+        
+        no_cut_pose.position.z += self.z_offset
+        no_cut_pose_list = PoseArray()
+        no_cut_pose_list.poses.append(no_cut_pose)
+        
+        self.cutting_ms.move_straight(no_cut_pose_list, "base_link", vel_scale=0.005, acc_scale=0.005)
+        
+        no_cut_pose_list.poses[0].position.z -= (self.depth_of_cut + self.z_offset)
+        
+        # goal_list = PoseArray()
+        # goal = Pose()
+        # goal.position.x = x
+        # goal.position.y = y
+        # goal.position.z = z - self.depth_of_cut
+        # #goal.position.z = z+z_offset
+        # goal.orientation.x = 0
+        # goal.orientation.y = 0.707
+        # goal.orientation.z = 0
+        # goal.orientation.w = 0.707
+        # goal_list.poses.append(goal)
+        self.cutting_ms.move_straight(no_cut_pose_list, "base_link", vel_scale=0.001, acc_scale=0.001)
+        
+        self.change_controller('joint_group_velocity_controller','joint_trajectory_controller')
         # temp_array = np.delete(self.pose_array,0, 0)
         # self.pose_array = None
         # self.pose_array = temp_array      
@@ -196,14 +229,14 @@ class Subscribers():
        # print("switching controller succeeded = ", res)
         setpoint_msg = Float64()
         #setpoint_msg.data = 0
-        setpoint_msg.data = goal.position.z
+        setpoint_msg.data = no_cut_pose_list.poses[0].position.z.position.z
         self.setpoint_pub.publish(setpoint_msg)
         self.pose_flag = True
         print("CUT XYZ Received")
            
     def timer_callback(self,event):
         if(self.pose_flag == True):
-            source_frame = "tool0"
+            source_frame = "milling_tool"
             target_frame = "base_link"
             self.transformer_listener.waitForTransform(target_frame, source_frame, rospy.Time(),rospy.Duration(0.001))
             trans, rot = self.transformer_listener.lookupTransform(target_frame, source_frame ,rospy.Time())
@@ -306,15 +339,16 @@ class Subscribers():
                 message_output.twist.angular.z = 0
                 self.output_pub.publish(message_output)
             if self.completed_flag == True:
-                source_frame = "tool0"
+                source_frame = "milling_tool"
                 target_frame = "base_link"
                 print("Returning to start position")
-                self.servo_launch.shutdown()
+                #self.servo_launch.shutdown()
+                self.change_controller('joint_trajectory_controller','joint_group_velocity_controller')
                 rospy.sleep(5)
                 self.transformer_listener.waitForTransform(target_frame, source_frame, rospy.Time(),rospy.Duration(0.001))
                 trans, rot = self.transformer_listener.lookupTransform(target_frame, source_frame ,rospy.Time())
-                self.robot.group.set_pose_target([trans[0],trans[1], trans[2]+0.05, 0, 1, 0, 0])
-                self.robot.group.go()
+                self.cutting_ms.move_group.set_pose_target([trans[0],trans[1], trans[2]+0.05, 0, 0.707, 0, 0.707])
+                self.cutting_ms.move_group.go()
                 
                 # cutting tool off
                 self.cutting_tool.wait_for_service()
@@ -323,14 +357,14 @@ class Subscribers():
                 cutting_tool_on.value = "0"
                 self.cutting_tool(cutting_tool_on)
                 
-                source_frame = "camera_start"
-                target_frame = "base_link"
-                rospy.sleep(1)
-                self.transformer_listener.waitForTransform(target_frame, source_frame, rospy.Time(),rospy.Duration(0.001))
-                trans, rot = self.transformer_listener.lookupTransform(target_frame, source_frame ,rospy.Time())
+                # source_frame = "camera_start"
+                # target_frame = "base_link"
+                # rospy.sleep(1)
+                # self.transformer_listener.waitForTransform(target_frame, source_frame, rospy.Time(),rospy.Duration(0.001))
+                # trans, rot = self.transformer_listener.lookupTransform(target_frame, source_frame ,rospy.Time())
 
-                self.robot.group.set_pose_target([trans[0],trans[1], trans[2], rot[0], rot[1], rot[2], rot[3]])
-                self.robot.group.go()
+                # self.cutting_ms.move_group.set_pose_target([trans[0],trans[1], trans[2], rot[0], rot[1], rot[2], rot[3]])
+                # self.cutting_ms.move_group.go()
                 
                 self.working_flag = False
             #rospy.sleep(10)

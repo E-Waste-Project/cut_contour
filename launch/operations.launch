@@ -1,0 +1,12 @@
+<launch>
+
+<node name="path_tracking" pkg="cut_contour" type="servo_cut.py" output="screen" /> 
+     <!-- <node name="path_tracking" pkg="cut_contour" type="cut_contour.py" output="screen" /> -->
+<node pkg="screw_loosening" type="loosen_it.py" name="loosen_it" output="screen"/>
+<node pkg="cut_contour" type="grip.py" name="grip" output="screen"/>
+<node pkg="cut_contour" type="suction.py" name="suction" output="screen"/>
+
+<node pkg="flipping" type="flipping_planner.py" name="flipping" output="screen"/>
+
+
+</launch>

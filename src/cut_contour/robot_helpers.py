@@ -34,6 +34,30 @@ def filter_plan(plan):
         last_time_step = point.time_from_start.to_sec
     return new_plan
 
+def generate_spiral(X, Y, ref_pose, ref_frame="capture_frame", step=1):
+    x = y = 0
+    dx = 0
+    dy = -step
+    pose_array = PoseArray()
+    pose_array.header.frame_id = ref_frame
+    X_mm = int(X * 1000)
+    Y_mm = int(Y * 1000)
+    for i in range(max(X_mm, Y_mm)**2):
+        if (x-X_mm/2 < x <= x+X_mm/2) and (y-Y_mm/2 < y <= y+Y_mm/2):
+            pose = Pose()
+            pose.position.x = ref_pose.position.x + (x / 1000.0)
+            pose.position.y = ref_pose.position.y + (y / 1000.0)
+            pose.position.z = ref_pose.position.z
+            pose.orientation.x = ref_pose.orientation.x
+            pose.orientation.y = ref_pose.orientation.y
+            pose.orientation.z = ref_pose.orientation.z
+            pose.orientation.w = ref_pose.orientation.w
+            pose_array.poses.append(pose)
+        if x == y or (x < 0 and x == -y) or (x > 0 and x == 1-y):
+            dx, dy = -dy, dx
+        x, y = x+dx, y+dy
+    
+    return pose_array
 
 class TransformServices():
     def __init__(self):
@@ -130,10 +154,11 @@ class MotionServices():
                       wait_execution=True):
         # set the pose_arr referef_framerence frame
         self.move_group.set_pose_reference_frame(ref_frame)
-
-        plan, fraction = self.move_group.compute_cartesian_path(
-            poses.poses, eef_step, jump_threshold, avoid_collisions)
-        print(fraction)
+        fraction = 0
+        while fraction == 0.0:
+            plan, fraction = self.move_group.compute_cartesian_path(
+                poses.poses, eef_step, jump_threshold, avoid_collisions)
+            print(fraction)
 
         # filter the output plan    def cut_cb(self, contour_msg):
         filtered_plan = filter_plan(plan)

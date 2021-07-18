@@ -3,5 +3,6 @@
         "/home/zaferpc/abb_ws/devel/lib/python2.7/dist-packages",
         "/opt/ros/melodic/lib/python2.7/dist-packages",
         "/home/zaferpc/abb_ws/src/cut_contour/src"
-    ]
+    ],
+    "ros.distro": "melodic"
 }
